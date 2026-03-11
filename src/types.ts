@@ -18,7 +18,6 @@ export interface SvgOptions {
   style?: SvgStyle;
   cornerStyle?: CornerStyle;
   lineWidth?: LineWidth;
-  layers?: boolean;
 }
 
 export interface QrMatrix {

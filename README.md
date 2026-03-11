@@ -1,23 +1,20 @@
 # @verevoir/qr
 
-QR code encoding engine and SVG renderers. Multiple visual styles, fabrication-ready layers, multi-candidate mask selection. Zero runtime dependencies.
+Text to QR code in TypeScript. Eight SVG styles, zero dependencies.
 
 ## Styles
 
-<p>
-  <img src="docs/style-square.svg" width="130" alt="Square style">
-  <img src="docs/style-dots.svg" width="130" alt="Dots style">
-  <img src="docs/style-horizontal.svg" width="130" alt="Horizontal style">
-  <img src="docs/style-diagonal.svg" width="130" alt="Diagonal style">
-  <img src="docs/style-metro.svg" width="130" alt="Metro style">
-</p>
+There are a number fo style variations but these are some examples.
+| squares | dots<br />(photo overlay) | horizontal | diagonal | metro |
+| --- | --- | --- | --- | --- |
+| squares<br /><img src="docs/style-square.svg" width="130" alt="Square style"> | <img src="docs/style-dots.svg" width="130" alt="Square style"> | <img src="docs/style-horizontal.svg" width="130" alt="Horizontal style"> | <img src="docs/style-diagonal.svg" width="130" alt="Square style"> | <img src="docs/style-metro.svg" width="130" alt="Square style"> |
 
 ## What It Does
 
-- **Encode** — text to QR matrix, versions 1–40, error correction levels L/M/Q/H, numeric/alphanumeric/byte modes
-- **Multi-candidate** — returns multiple mask variants above a quality threshold so you can choose aesthetically, not just technically
-- **SVG rendering** — eight visual styles, three corner treatments, two line widths, optional layer separation for fabrication
-- **PNG export** — browser-only `svgToPng()` renders via canvas, `downloadPng()` triggers a file download
+- **Encode** — text in, QR matrix out. Versions 1–40, all four error correction levels, auto mode selection.
+- **Multiple masks** — gives you several mask variants ranked by quality, so you pick the one that looks best for your use case.
+- **SVG rendering** — eight styles, three corner shapes, two line weights. Most styles output closed paths directly.
+- **PNG export** — `svgToPng()` and `downloadPng()` for browser use. No server needed.
 
 ## Install
 
@@ -69,18 +66,6 @@ for (const style of styles) {
 }
 ```
 
-### Fabrication Layers
-
-```typescript
-import { encode, toSvg } from '@verevoir/qr';
-
-const results = encode('https://example.com');
-const svg = toSvg(results[0], { style: 'dots', layers: true });
-
-// SVG contains separate <g id="dark">, <g id="light">, <g id="background"> groups
-// Export each layer independently for 3D printing, laser cutting, or CNC engraving
-```
-
 ### PNG Export (Browser)
 
 ```typescript
@@ -113,12 +98,12 @@ await downloadPng(svg, { size: 1024, filename: 'qr-code.png' });
 
 ### Options
 
-| Type          | Values                                                                               | Default    |
-| ------------- | ------------------------------------------------------------------------------------ | ---------- |
+| Type          | Values                                                                                                           | Default    |
+| ------------- | ---------------------------------------------------------------------------------------------------------------- | ---------- |
 | `SvgStyle`    | `'square'` \| `'dots'` \| `'horizontal'` \| `'vertical'` \| `'diagonal'` \| `'grid'` \| `'tubemap'` \| `'metro'` | `'square'` |
-| `CornerStyle` | `'square'` \| `'rounded'` \| `'round'`                                               | `'square'` |
-| `LineWidth`   | `'normal'` \| `'thin'`                                                               | `'normal'` |
-| `ErrorLevel`  | `'L'` \| `'M'` \| `'Q'` \| `'H'`                                                     | `'L'`      |
+| `CornerStyle` | `'square'` \| `'rounded'` \| `'round'`                                                                           | `'square'` |
+| `LineWidth`   | `'normal'` \| `'thin'`                                                                                           | `'normal'` |
+| `ErrorLevel`  | `'L'` \| `'M'` \| `'Q'` \| `'H'`                                                                                 | `'L'`      |
 
 ### SVG Styles
 
@@ -130,7 +115,7 @@ await downloadPng(svg, { size: 1024, filename: 'qr-code.png' });
 | `vertical`   | Vertical line segments for consecutive dark modules   |
 | `diagonal`   | Diagonal line segments in both directions             |
 | `grid`       | Connected dark regions traced as filled outline paths |
-| `tubemap`    | Diagonal-first lines, then horizontal and vertical   |
+| `tubemap`    | Diagonal-first lines, then horizontal and vertical    |
 | `metro`      | Horizontal over vertical over diagonal layered lines  |
 
 ## Architecture
@@ -148,11 +133,11 @@ await downloadPng(svg, { size: 1024, filename: 'qr-code.png' });
 
 ## Design Decisions
 
-- **Multi-candidate output.** Most QR libraries return a single "best" result. This engine returns all masks within a quality threshold because aesthetic preferences are subjective and context-dependent.
-- **Vector-only output.** SVG only — no bitmap generation. QR codes are inherently grid-based; vector output scales perfectly for print, screen, and fabrication.
-- **Fabrication-ready layers.** The dots renderer emits dark, light, and background as separate SVG `<g>` groups. This enables direct use in laser cutting, CNC engraving, and 3D printing workflows.
-- **Connected-component grid renderer.** The grid style uses flood-fill to identify connected dark regions and traces their boundaries as filled paths — clean outlines, not overlapping lines.
-- **Zero runtime dependencies.** Pure TypeScript. GF(256) arithmetic, Reed-Solomon encoding, and all rendering is self-contained.
+- **Multiple masks, not just one.** Most QR libraries pick the "best" mask for you. This one gives you all the good options — what looks best depends on the style and context.
+- **SVG only.** QR codes are grids — vectors scale perfectly. No bitmap rendering built in (use the browser PNG export if you need pixels).
+- **Outline tracing.** The square and grid styles trace connected regions as single paths rather than individual rectangles. Cleaner SVG, works in CAD tools without conversion.
+- **Layer separation.** The dots renderer outputs dark and light as separate `<g id="dark">` / `<g id="light">` groups.
+- **No dependencies.** Everything — GF(256) maths, Reed-Solomon, rendering — is self-contained TypeScript.
 
 ## Acknowledgements
 

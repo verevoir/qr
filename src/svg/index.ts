@@ -19,8 +19,6 @@ export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
   const style: SvgStyle = options?.style ?? 'square';
   const cornerStyle: CornerStyle = options?.cornerStyle ?? 'rounded';
   const lineWidth: LineWidth = options?.lineWidth ?? 'normal';
-  const layers = options?.layers ?? false;
-
   let content = '';
 
   // Corner patterns (finder + alignment)
@@ -30,7 +28,7 @@ export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
   // Timing patterns are included in the data matrix and rendered in-style.
   switch (style) {
     case 'dots':
-      content += renderDots(qr, layers, 'thin');
+      content += renderDots(qr, 'thin');
       break;
     case 'horizontal':
       content += renderHorizontal(qr, lineWidth);
@@ -56,5 +54,5 @@ export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
       break;
   }
 
-  return wrapSvg(qr.size, content, layers);
+  return wrapSvg(qr.size, content);
 }

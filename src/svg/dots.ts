@@ -1,11 +1,7 @@
 import type { QrMatrix, LineWidth } from '../types.js';
 import { fixedFeatureMask, dotWidth } from './shared.js';
 
-export function renderDots(
-  qr: QrMatrix,
-  layers: boolean,
-  lineWidth: LineWidth,
-): string {
+export function renderDots(qr: QrMatrix, lineWidth: LineWidth): string {
   const mask = fixedFeatureMask(qr);
   const sw = dotWidth(lineWidth);
   let darkDots = '';
@@ -24,12 +20,5 @@ export function renderDots(
     }
   }
 
-  if (layers) {
-    return (
-      `<g id="light">${lightDots}</g>` +
-      `<g id="dark">${darkDots}</g>`
-    );
-  }
-
-  return lightDots + darkDots;
+  return `<g id="light">${lightDots}</g><g id="dark">${darkDots}</g>`;
 }

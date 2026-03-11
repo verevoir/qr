@@ -47,18 +47,7 @@ export function dotWidth(lw: LineWidth): number {
   return lw === 'thin' ? 0.65 : 0.9;
 }
 
-export function wrapSvg(
-  size: number,
-  content: string,
-  layers: boolean,
-): string {
+export function wrapSvg(size: number, content: string): string {
   const viewSize = size + 2;
-  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewSize} ${viewSize}">`;
-  if (layers) {
-    svg += content;
-  } else {
-    svg += `<g>${content}</g>`;
-  }
-  svg += '</svg>';
-  return svg;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewSize} ${viewSize}"><g>${content}</g></svg>`;
 }
