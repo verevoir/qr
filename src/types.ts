@@ -6,7 +6,8 @@ export type SvgStyle =
   | 'horizontal'
   | 'vertical'
   | 'diagonal'
-  | 'grid';
+  | 'grid'
+  | 'tubemap';
 
 export type CornerStyle = 'square' | 'rounded' | 'round';
 

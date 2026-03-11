@@ -9,7 +9,7 @@ export function renderSquare(qr: QrMatrix): string {
     for (let col = 0; col < qr.size; col++) {
       if (mask[row][col] === 0) continue;
       if (qr.matrix[row][col] === 1) {
-        out += `<rect x="${col + 0.5}" y="${row + 0.5}" width="1" height="1" fill="#000"/>`;
+        out += `<rect x="${col + 1}" y="${row + 1}" width="1" height="1" fill="#000"/>`;
       }
     }
   }
