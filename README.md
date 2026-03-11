@@ -7,7 +7,7 @@ Text to QR code in TypeScript. Eight SVG styles, zero dependencies.
 There are a number fo style variations but these are some examples.
 | squares | dots<br />(photo overlay) | horizontal | diagonal | metro |
 | --- | --- | --- | --- | --- |
-| squares<br /><img src="docs/style-square.svg" width="130" alt="Square style"> | <img src="docs/style-dots.svg" width="130" alt="Square style"> | <img src="docs/style-horizontal.svg" width="130" alt="Horizontal style"> | <img src="docs/style-diagonal.svg" width="130" alt="Square style"> | <img src="docs/style-metro.svg" width="130" alt="Square style"> |
+| <img src="docs/style-square.svg" width="130" alt="Square style"> | <img src="docs/style-dots.svg" width="130" alt="Square style"> | <img src="docs/style-horizontal.svg" width="130" alt="Horizontal style"> | <img src="docs/style-diagonal.svg" width="130" alt="Square style"> | <img src="docs/style-metro.svg" width="130" alt="Square style"> |
 
 ## What It Does
 
