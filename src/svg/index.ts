@@ -13,7 +13,7 @@ import { renderHorizontal } from './horizontal.js';
 import { renderVertical } from './vertical.js';
 import { renderDiagonal } from './diagonal.js';
 import { renderGrid } from './grid.js';
-import { renderTubemap } from './tubemap.js';
+import { renderTubemap, renderMetro } from './tubemap.js';
 
 export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
   const style: SvgStyle = options?.style ?? 'square';
@@ -26,13 +26,8 @@ export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
   // Corner patterns (finder + alignment)
   content += renderCorners(qr, cornerStyle);
 
-  // Timing patterns (row 6 and col 6 between finders)
-  // Dots renderer handles its own timing marks, so skip for dots.
-  if (style !== 'dots') {
-    content += renderTimingPatterns(qr);
-  }
-
   // Data modules in the chosen style
+  // Timing patterns are included in the data matrix and rendered in-style.
   switch (style) {
     case 'dots':
       content += renderDots(qr, layers, 'thin');
@@ -52,6 +47,9 @@ export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
     case 'tubemap':
       content += renderTubemap(qr, lineWidth);
       break;
+    case 'metro':
+      content += renderMetro(qr, lineWidth);
+      break;
     case 'square':
     default:
       content += renderSquare(qr);
@@ -59,30 +57,4 @@ export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
   }
 
   return wrapSvg(qr.size, content, layers);
-}
-
-/**
- * Render timing pattern modules between the finder regions.
- * Row 6 (horizontal) and column 6 (vertical), only the portions
- * between the 9-module finder+separator blocks.
- */
-function renderTimingPatterns(qr: QrMatrix): string {
-  const size = qr.size;
-  let out = '';
-
-  // Horizontal timing (row 6, cols 8 to size-9)
-  for (let col = 8; col < size - 8; col++) {
-    if (qr.matrix[6][col] === 1) {
-      out += `<rect x="${col + 1}" y="${7}" width="1" height="1" fill="#000"/>`;
-    }
-  }
-
-  // Vertical timing (col 6, rows 8 to size-9)
-  for (let row = 8; row < size - 8; row++) {
-    if (qr.matrix[row][6] === 1) {
-      out += `<rect x="${7}" y="${row + 1}" width="1" height="1" fill="#000"/>`;
-    }
-  }
-
-  return out;
 }

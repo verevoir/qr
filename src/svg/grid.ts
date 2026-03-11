@@ -2,10 +2,12 @@ import type { QrMatrix } from '../types.js';
 import { fixedFeatureMask } from './shared.js';
 
 /**
- * Grid renderer — traces outlines of connected dark-module regions
+ * Outline renderer — traces outlines of connected dark-module regions
  * as filled SVG paths. Uses edge-based boundary tracing for correctness.
+ *
+ * @param cornerRadius — quadratic bezier radius at path corners (0 = sharp)
  */
-export function renderGrid(qr: QrMatrix): string {
+export function renderGrid(qr: QrMatrix, cornerRadius = 0.25): string {
   const mask = fixedFeatureMask(qr);
   const size = qr.size;
 
@@ -57,9 +59,9 @@ export function renderGrid(qr: QrMatrix): string {
       }
 
       const cells = new Set(component.map(([r, c]) => `${r},${c}`));
-      const path = traceOutline(cells);
+      const path = traceOutline(cells, cornerRadius);
       if (path) {
-        out += `<path d="${path}" fill="#000" fill-rule="evenodd" stroke="#000" stroke-width="0.15" stroke-linejoin="round"/>`;
+        out += `<path d="${path}" fill="#000" fill-rule="evenodd"/>`;
       }
     }
   }
@@ -78,7 +80,7 @@ export function renderGrid(qr: QrMatrix): string {
  * For 4-connected components, each dual-grid vertex has exactly one
  * incoming and one outgoing boundary edge, so chaining is unambiguous.
  */
-function traceOutline(cells: Set<string>): string | null {
+function traceOutline(cells: Set<string>, cornerRadius: number): string | null {
   if (cells.size === 0) return null;
 
   const has = (r: number, c: number) => cells.has(`${r},${c}`);
@@ -156,14 +158,82 @@ function traceOutline(cells: Set<string>): string | null {
     // Remove collinear intermediate points
     const simplified = simplifyLoop(points);
 
-    d += `M${simplified[0][0] + ox},${simplified[0][1] + oy}`;
-    for (let i = 1; i < simplified.length; i++) {
-      d += `L${simplified[i][0] + ox},${simplified[i][1] + oy}`;
+    if (cornerRadius > 0) {
+      d += roundedSubpath(simplified, ox, oy, cornerRadius);
+    } else {
+      d += `M${simplified[0][0] + ox},${simplified[0][1] + oy}`;
+      for (let i = 1; i < simplified.length; i++) {
+        d += `L${simplified[i][0] + ox},${simplified[i][1] + oy}`;
+      }
+      d += 'Z';
     }
-    d += 'Z';
   }
 
   return d || null;
+}
+
+/**
+ * Build a rounded SVG subpath for one closed loop of corner points.
+ * At each corner, the last `r` units of the incoming edge and the first `r`
+ * units of the outgoing edge are replaced with a quadratic bezier curve
+ * whose control point is the original corner vertex.
+ */
+function roundedSubpath(
+  pts: [number, number][],
+  ox: number,
+  oy: number,
+  r: number,
+): string {
+  const n = pts.length;
+  if (n < 3) {
+    // Degenerate — just emit straight lines
+    let s = `M${pts[0][0] + ox},${pts[0][1] + oy}`;
+    for (let i = 1; i < n; i++) s += `L${pts[i][0] + ox},${pts[i][1] + oy}`;
+    return s + 'Z';
+  }
+
+  let s = '';
+
+  for (let i = 0; i < n; i++) {
+    const prev = pts[(i - 1 + n) % n];
+    const curr = pts[i];
+    const next = pts[(i + 1) % n];
+
+    // Direction from prev → curr
+    const dx0 = curr[0] - prev[0];
+    const dy0 = curr[1] - prev[1];
+    const len0 = Math.sqrt(dx0 * dx0 + dy0 * dy0);
+
+    // Direction from curr → next
+    const dx1 = next[0] - curr[0];
+    const dy1 = next[1] - curr[1];
+    const len1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+
+    // Clamp radius so it doesn't exceed half the shorter edge
+    const cr = Math.min(r, len0 / 2, len1 / 2);
+
+    // Point where curve starts (on prev→curr edge, r before curr)
+    const ax = curr[0] - (dx0 / len0) * cr + ox;
+    const ay = curr[1] - (dy0 / len0) * cr + oy;
+
+    // Point where curve ends (on curr→next edge, r after curr)
+    const bx = curr[0] + (dx1 / len1) * cr + ox;
+    const by = curr[1] + (dy1 / len1) * cr + oy;
+
+    // Control point is the original corner
+    const cx = curr[0] + ox;
+    const cy = curr[1] + oy;
+
+    if (i === 0) {
+      s += `M${ax},${ay}`;
+    } else {
+      s += `L${ax},${ay}`;
+    }
+
+    s += `Q${cx},${cy},${bx},${by}`;
+  }
+
+  return s + 'Z';
 }
 
 /** Remove points that lie on a straight line between their neighbours. */

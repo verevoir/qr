@@ -10,32 +10,15 @@ export function fixedFeatureMask(qr: QrMatrix): Uint8Array[] {
   const size = qr.size;
   const mask = Array.from({ length: size }, () => new Uint8Array(size).fill(1));
 
+  // Finder patterns — only the 7x7 pattern itself (rendered by corner renderer).
+  // Separator (white, 1 module) and format info are in the matrix and render in-style.
   for (const coord of qr.finderCoordinates) {
-    const r = coord[0] === 0 ? 0 : coord[0] - 1;
-    const c = coord[1] === 0 ? 0 : coord[1] - 1;
-    const w = coord[0] === 0 && coord[1] === 0 ? 9 : 8;
-    const h = coord[0] === 0 && coord[1] === 0 ? 9 : 8;
-    // Fill the full area including separator
-    for (let row = r; row < Math.min(r + h, size); row++) {
-      for (let col = c; col < Math.min(c + w, size); col++) {
-        mask[row][col] = 0;
-      }
-    }
+    fillMaskArea(mask, coord[0], coord[1], 7, 7, size);
   }
 
-  // Finder patterns with separators: top-left 9x9, top-right 8x9, bottom-left 9x8
-  fillMaskArea(mask, 0, 0, 9, 9, size);
-  fillMaskArea(mask, 0, size - 8, 8, 9, size);
-  fillMaskArea(mask, size - 8, 0, 9, 8, size);
-
+  // Alignment patterns — 5x5 (rendered by corner renderer).
   for (const coord of qr.alignmentCoordinates) {
     fillMaskArea(mask, coord[0], coord[1], 5, 5, size);
-  }
-
-  // Timing patterns (full row 6 and column 6)
-  for (let i = 0; i < size; i++) {
-    mask[6][i] = 0;
-    mask[i][6] = 0;
   }
 
   return mask;
@@ -57,11 +40,11 @@ function fillMaskArea(
 }
 
 export function strokeWidth(lw: LineWidth): number {
-  return lw === 'thin' ? 0.5 : 0.9;
+  return lw === 'thin' ? 0.65 : 0.9;
 }
 
 export function dotWidth(lw: LineWidth): number {
-  return lw === 'thin' ? 0.5 : 0.9;
+  return lw === 'thin' ? 0.65 : 0.9;
 }
 
 export function wrapSvg(

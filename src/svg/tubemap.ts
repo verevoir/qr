@@ -7,162 +7,114 @@ import {
 } from './shared.js';
 
 /**
- * Tubemap renderer — combines diagonal, horizontal, and vertical line segments.
+ * Tubemap renderer — diagonal-first, then horizontal and vertical fill in the gaps.
+ * Each module is consumed by at most one pass (no visual overlaps).
  *
- * Priority order:
- *   1. Diagonal runs (\ and / — both passes share the matrix)
- *   2. Horizontal runs from remaining modules
- *   3. Vertical runs from remaining modules
- *   4. Singles as dots
- *
- * Each module is consumed by at most one pass, so there are no visual overlaps.
- * Round linecaps create natural junctions where lines from different passes meet.
+ * Priority: diagonal \ → diagonal / → horizontal → vertical → singles.
  */
 export function renderTubemap(qr: QrMatrix, lineWidth: LineWidth): string {
-  const matrix = duplicateMatrix(qr.dataMatrix);
+  const matrix = duplicateMatrix(qr.matrix);
   const mask = fixedFeatureMask(qr);
   const sw = strokeWidth(lineWidth);
   const dw = dotWidth(lineWidth);
   const size = qr.size;
   let lines = '';
 
-  // --- Pass 1: Diagonal \ (top-left to bottom-right) ---
+  const isDark = (row: number, col: number) =>
+    mask[row][col] === 1 && matrix[row][col] === 1;
+
+  const consume = (row: number, col: number) => {
+    matrix[row][col] = 0;
+  };
+
+  // --- Diagonal \ ---
   for (let d = 0; d < 2 * size - 1; d++) {
-    const startRow = Math.max(0, d - size + 1);
-    const startCol = Math.max(0, size - 1 - d);
-    const diagLength = Math.min(size - startRow, size - startCol);
-    let runStart: number | undefined;
-
-    for (let i = 0; i < diagLength; i++) {
-      const row = startRow + i;
-      const col = startCol + i;
-
-      if (mask[row][col] === 0) {
-        if (runStart !== undefined) {
-          lines += emitDiag(matrix, startRow, startCol, runStart, i, 1, sw);
-          runStart = undefined;
+    const sRow = Math.max(0, d - size + 1);
+    const sCol = Math.max(0, size - 1 - d);
+    const len = Math.min(size - sRow, size - sCol);
+    let rs: number | undefined;
+    for (let i = 0; i <= len; i++) {
+      const dark = i < len && isDark(sRow + i, sCol + i);
+      if (dark) {
+        if (rs === undefined) rs = i;
+      } else if (rs !== undefined) {
+        if (i - rs >= 2) {
+          const r1 = sRow + rs,
+            c1 = sCol + rs,
+            r2 = sRow + i - 1,
+            c2 = sCol + i - 1;
+          lines += line(c1, r1, c2, r2, sw);
+          for (let j = rs; j < i; j++) consume(sRow + j, sCol + j);
         }
-        continue;
+        rs = undefined;
       }
-      if (matrix[row][col] === 1) {
-        if (runStart === undefined) runStart = i;
-      } else {
-        if (runStart !== undefined) {
-          lines += emitDiag(matrix, startRow, startCol, runStart, i, 1, sw);
-          runStart = undefined;
-        }
-      }
-    }
-    if (runStart !== undefined) {
-      lines += emitDiag(
-        matrix,
-        startRow,
-        startCol,
-        runStart,
-        diagLength,
-        1,
-        sw,
-      );
     }
   }
 
-  // --- Pass 2: Diagonal / (top-right to bottom-left) ---
+  // --- Diagonal / ---
   for (let d = 0; d < 2 * size - 1; d++) {
-    const startRow = Math.max(0, d - size + 1);
-    const startCol = Math.min(size - 1, d);
-    const diagLength = Math.min(size - startRow, startCol + 1);
-    let runStart: number | undefined;
-
-    for (let i = 0; i < diagLength; i++) {
-      const row = startRow + i;
-      const col = startCol - i;
-
-      if (mask[row][col] === 0) {
-        if (runStart !== undefined) {
-          lines += emitDiag(matrix, startRow, startCol, runStart, i, -1, sw);
-          runStart = undefined;
+    const sRow = Math.max(0, d - size + 1);
+    const sCol = Math.min(size - 1, d);
+    const len = Math.min(size - sRow, sCol + 1);
+    let rs: number | undefined;
+    for (let i = 0; i <= len; i++) {
+      const dark = i < len && isDark(sRow + i, sCol - i);
+      if (dark) {
+        if (rs === undefined) rs = i;
+      } else if (rs !== undefined) {
+        if (i - rs >= 2) {
+          const r1 = sRow + rs,
+            c1 = sCol - rs,
+            r2 = sRow + i - 1,
+            c2 = sCol - (i - 1);
+          lines += line(c1, r1, c2, r2, sw);
+          for (let j = rs; j < i; j++) consume(sRow + j, sCol - j);
         }
-        continue;
+        rs = undefined;
       }
-      if (matrix[row][col] === 1) {
-        if (runStart === undefined) runStart = i;
-      } else {
-        if (runStart !== undefined) {
-          lines += emitDiag(matrix, startRow, startCol, runStart, i, -1, sw);
-          runStart = undefined;
-        }
-      }
-    }
-    if (runStart !== undefined) {
-      lines += emitDiag(
-        matrix,
-        startRow,
-        startCol,
-        runStart,
-        diagLength,
-        -1,
-        sw,
-      );
     }
   }
 
-  // --- Pass 3: Horizontal ---
+  // --- Horizontal ---
   for (let row = 0; row < size; row++) {
     let start: number | undefined;
-    for (let col = 0; col < size; col++) {
-      if (mask[row][col] === 0) {
-        if (start !== undefined) {
-          lines += emitHorizontal(matrix, row, start, col, sw);
-          start = undefined;
-        }
-        continue;
-      }
-      if (matrix[row][col] === 1) {
+    for (let col = 0; col <= size; col++) {
+      const dark = col < size && isDark(row, col);
+      if (dark) {
         if (start === undefined) start = col;
-      } else {
-        if (start !== undefined) {
-          lines += emitHorizontal(matrix, row, start, col, sw);
-          start = undefined;
+      } else if (start !== undefined) {
+        if (col - start >= 2) {
+          lines += line(start, row, col - 1, row, sw);
+          for (let c = start; c < col; c++) consume(row, c);
         }
+        start = undefined;
       }
-    }
-    if (start !== undefined) {
-      lines += emitHorizontal(matrix, row, start, size, sw);
     }
   }
 
-  // --- Pass 4: Vertical ---
+  // --- Vertical ---
   for (let col = 0; col < size; col++) {
     let start: number | undefined;
-    for (let row = 0; row < size; row++) {
-      if (mask[row][col] === 0) {
-        if (start !== undefined) {
-          lines += emitVertical(matrix, col, start, row, sw);
-          start = undefined;
-        }
-        continue;
-      }
-      if (matrix[row][col] === 1) {
+    for (let row = 0; row <= size; row++) {
+      const dark = row < size && isDark(row, col);
+      if (dark) {
         if (start === undefined) start = row;
-      } else {
-        if (start !== undefined) {
-          lines += emitVertical(matrix, col, start, row, sw);
-          start = undefined;
+      } else if (start !== undefined) {
+        if (row - start >= 2) {
+          lines += line(col, start, col, row - 1, sw);
+          for (let r = start; r < row; r++) consume(r, col);
         }
+        start = undefined;
       }
-    }
-    if (start !== undefined) {
-      lines += emitVertical(matrix, col, start, size, sw);
     }
   }
 
-  // --- Pass 5: Remaining singles as dots ---
+  // --- Singles ---
   let dots = '';
   for (let row = 0; row < size; row++) {
     for (let col = 0; col < size; col++) {
-      if (mask[row][col] === 0) continue;
-      if (matrix[row][col] === 1) {
-        dots += `<line x1="${col + 1.5}" y1="${row + 1.5}" x2="${col + 1.5}" y2="${row + 1.5}" stroke="#000" stroke-width="${dw}" stroke-linecap="round"/>`;
+      if (isDark(row, col)) {
+        dots += dot(col, row, dw);
       }
     }
   }
@@ -170,64 +122,146 @@ export function renderTubemap(qr: QrMatrix, lineWidth: LineWidth): string {
   return lines + dots;
 }
 
-// ---------------------------------------------------------------------------
-// Emit helpers — each marks consumed modules as 0 in the matrix
-// ---------------------------------------------------------------------------
+/**
+ * Metro renderer — horizontal over vertical over diagonal.
+ * All passes read the original matrix independently; lines may visually
+ * overlap at crossing points (same-colour strokes, invisible overlap).
+ * Produces the classic tube-map / metro-map layered-line aesthetic.
+ *
+ * Priority: diagonal (bottom) → vertical → horizontal (top).
+ * SVG paints later elements on top, so emit in bottom-to-top order.
+ */
+export function renderMetro(qr: QrMatrix, lineWidth: LineWidth): string {
+  const mask = fixedFeatureMask(qr);
+  const sw = strokeWidth(lineWidth);
+  const dw = dotWidth(lineWidth);
+  const size = qr.size;
 
-function emitDiag(
-  matrix: Uint8Array[],
-  diagStartRow: number,
-  diagStartCol: number,
-  runStart: number,
-  runEnd: number,
-  colDir: 1 | -1,
-  sw: number,
-): string {
-  const length = runEnd - runStart;
-  if (length <= 1) return '';
+  const isDark = (row: number, col: number) =>
+    row >= 0 &&
+    row < size &&
+    col >= 0 &&
+    col < size &&
+    mask[row][col] === 1 &&
+    qr.matrix[row][col] === 1;
 
-  const r1 = diagStartRow + runStart;
-  const c1 = diagStartCol + colDir * runStart;
-  const r2 = diagStartRow + runEnd - 1;
-  const c2 = diagStartCol + colDir * (runEnd - 1);
+  // Track which modules appear in at least one run (for singles pass)
+  const covered = Array.from({ length: size }, () => new Uint8Array(size));
 
-  for (let i = runStart; i < runEnd; i++) {
-    matrix[diagStartRow + i][diagStartCol + colDir * i] = 0;
+  let diagLines = '';
+  let vLines = '';
+  let hLines = '';
+
+  // --- Diagonal \ (bottom layer) ---
+  for (let d = 0; d < 2 * size - 1; d++) {
+    const sRow = Math.max(0, d - size + 1);
+    const sCol = Math.max(0, size - 1 - d);
+    const len = Math.min(size - sRow, size - sCol);
+    let rs: number | undefined;
+    for (let i = 0; i <= len; i++) {
+      const dark = i < len && isDark(sRow + i, sCol + i);
+      if (dark) {
+        if (rs === undefined) rs = i;
+      } else if (rs !== undefined) {
+        if (i - rs >= 2) {
+          const r1 = sRow + rs,
+            c1 = sCol + rs,
+            r2 = sRow + i - 1,
+            c2 = sCol + i - 1;
+          diagLines += line(c1, r1, c2, r2, sw);
+          for (let j = rs; j < i; j++) covered[sRow + j][sCol + j] = 1;
+        }
+        rs = undefined;
+      }
+    }
   }
 
+  // --- Diagonal / (bottom layer) ---
+  for (let d = 0; d < 2 * size - 1; d++) {
+    const sRow = Math.max(0, d - size + 1);
+    const sCol = Math.min(size - 1, d);
+    const len = Math.min(size - sRow, sCol + 1);
+    let rs: number | undefined;
+    for (let i = 0; i <= len; i++) {
+      const dark = i < len && isDark(sRow + i, sCol - i);
+      if (dark) {
+        if (rs === undefined) rs = i;
+      } else if (rs !== undefined) {
+        if (i - rs >= 2) {
+          const r1 = sRow + rs,
+            c1 = sCol - rs,
+            r2 = sRow + i - 1,
+            c2 = sCol - (i - 1);
+          diagLines += line(c1, r1, c2, r2, sw);
+          for (let j = rs; j < i; j++) covered[sRow + j][sCol - j] = 1;
+        }
+        rs = undefined;
+      }
+    }
+  }
+
+  // --- Vertical (middle layer) ---
+  for (let col = 0; col < size; col++) {
+    let start: number | undefined;
+    for (let row = 0; row <= size; row++) {
+      const dark = row < size && isDark(row, col);
+      if (dark) {
+        if (start === undefined) start = row;
+      } else if (start !== undefined) {
+        if (row - start >= 2) {
+          vLines += line(col, start, col, row - 1, sw);
+          for (let r = start; r < row; r++) covered[r][col] = 1;
+        }
+        start = undefined;
+      }
+    }
+  }
+
+  // --- Horizontal (top layer) ---
+  for (let row = 0; row < size; row++) {
+    let start: number | undefined;
+    for (let col = 0; col <= size; col++) {
+      const dark = col < size && isDark(row, col);
+      if (dark) {
+        if (start === undefined) start = col;
+      } else if (start !== undefined) {
+        if (col - start >= 2) {
+          hLines += line(start, row, col - 1, row, sw);
+          for (let c = start; c < col; c++) covered[row][c] = 1;
+        }
+        start = undefined;
+      }
+    }
+  }
+
+  // --- Singles (modules not in any run) ---
+  let dots = '';
+  for (let row = 0; row < size; row++) {
+    for (let col = 0; col < size; col++) {
+      if (isDark(row, col) && covered[row][col] === 0) {
+        dots += dot(col, row, dw);
+      }
+    }
+  }
+
+  // Bottom to top: diagonal → vertical → horizontal → singles
+  return diagLines + vLines + hLines + dots;
+}
+
+// ---------------------------------------------------------------------------
+// SVG primitives
+// ---------------------------------------------------------------------------
+
+function line(
+  c1: number,
+  r1: number,
+  c2: number,
+  r2: number,
+  sw: number,
+): string {
   return `<line x1="${c1 + 1.5}" y1="${r1 + 1.5}" x2="${c2 + 1.5}" y2="${r2 + 1.5}" stroke="#000" stroke-width="${sw}" stroke-linecap="round"/>`;
 }
 
-function emitHorizontal(
-  matrix: Uint8Array[],
-  row: number,
-  start: number,
-  end: number,
-  sw: number,
-): string {
-  const length = end - start;
-  if (length <= 1) return '';
-
-  for (let col = start; col < end; col++) {
-    matrix[row][col] = 0;
-  }
-
-  return `<line x1="${start + 1.5}" y1="${row + 1.5}" x2="${end - 1 + 1.5}" y2="${row + 1.5}" stroke="#000" stroke-width="${sw}" stroke-linecap="round"/>`;
-}
-
-function emitVertical(
-  matrix: Uint8Array[],
-  col: number,
-  start: number,
-  end: number,
-  sw: number,
-): string {
-  const length = end - start;
-  if (length <= 1) return '';
-
-  for (let row = start; row < end; row++) {
-    matrix[row][col] = 0;
-  }
-
-  return `<line x1="${col + 1.5}" y1="${start + 1.5}" x2="${col + 1.5}" y2="${end - 1 + 1.5}" stroke="#000" stroke-width="${sw}" stroke-linecap="round"/>`;
+function dot(col: number, row: number, dw: number): string {
+  return `<line x1="${col + 1.5}" y1="${row + 1.5}" x2="${col + 1.5}" y2="${row + 1.5}" stroke="#000" stroke-width="${dw}" stroke-linecap="round"/>`;
 }

@@ -7,7 +7,8 @@ export type SvgStyle =
   | 'vertical'
   | 'diagonal'
   | 'grid'
-  | 'tubemap';
+  | 'tubemap'
+  | 'metro';
 
 export type CornerStyle = 'square' | 'rounded' | 'round';
 

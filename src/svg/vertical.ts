@@ -7,7 +7,7 @@ import {
 } from './shared.js';
 
 export function renderVertical(qr: QrMatrix, lineWidth: LineWidth): string {
-  const matrix = duplicateMatrix(qr.dataMatrix);
+  const matrix = duplicateMatrix(qr.matrix);
   const mask = fixedFeatureMask(qr);
   const sw = strokeWidth(lineWidth);
   const dw = dotWidth(lineWidth);

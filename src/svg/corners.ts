@@ -71,8 +71,8 @@ function renderSquareAlignment(x: number, y: number): string {
 // ---------------------------------------------------------------------------
 function renderRoundedFinder(x: number, y: number): string {
   return (
-    `<rect x="${x}" y="${y}" width="7" height="7" rx="2" fill="#000"/>` +
-    `<rect x="${x + 1}" y="${y + 1}" width="5" height="5" rx="1.5" fill="#fff"/>` +
+    `<rect x="${x - 0.25}" y="${y - 0.25}" width="7.5" height="7.5" rx="2" fill="#000"/>` +
+    `<rect x="${x + 0.9}" y="${y + 0.9}" width="5.25" height="5.25" rx="1.25" fill="#fff"/>` +
     `<rect x="${x + 2}" y="${y + 2}" width="3" height="3" rx="1" fill="#000"/>`
   );
 }
@@ -81,7 +81,7 @@ function renderRoundedAlignment(x: number, y: number): string {
   return (
     `<rect x="${x}" y="${y}" width="5" height="5" rx="1.5" fill="#000"/>` +
     `<rect x="${x + 1}" y="${y + 1}" width="3" height="3" rx="1" fill="#fff"/>` +
-    `<rect x="${x + 2}" y="${y + 2}" width="1" height="1" rx="0.5" fill="#000"/>`
+    `<rect x="${x + 1.75}" y="${y + 1.75}" width="1.5" height="1.5" rx="0.5" fill="#000"/>`
   );
 }
 
@@ -92,9 +92,9 @@ function renderRoundFinder(x: number, y: number): string {
   const cx = x + 3.5;
   const cy = y + 3.5;
   return (
-    `<circle cx="${cx}" cy="${cy}" r="3.5" fill="#000"/>` +
-    `<circle cx="${cx}" cy="${cy}" r="2.5" fill="#fff"/>` +
-    `<circle cx="${cx}" cy="${cy}" r="1.5" fill="#000"/>`
+    `<circle cx="${cx}" cy="${cy}" r="3.75" fill="#000"/>` +
+    `<circle cx="${cx}" cy="${cy}" r="2.75" fill="#fff"/>` +
+    `<circle cx="${cx}" cy="${cy}" r="1.75" fill="#000"/>`
   );
 }
 
