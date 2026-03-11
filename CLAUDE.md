@@ -52,3 +52,7 @@ npm install
 ## Dependencies
 
 Zero runtime dependencies. Pure TypeScript.
+
+## Acknowledgements
+
+The encoding engine was built with the help of Massimo Artizzu's excellent ["Let's Develop a QR Code Generator"](https://dev.to/maxart2501/let-s-develop-a-qr-code-generator-part-i-basic-concepts-510a) series on Dev.to, which walks through the QR specification from first principles.
