@@ -2,11 +2,21 @@
 
 QR code encoding engine and SVG renderers. Multiple visual styles, fabrication-ready layers, multi-candidate mask selection. Zero runtime dependencies.
 
+## Styles
+
+<p>
+  <img src="docs/style-square.svg" width="130" alt="Square style">
+  <img src="docs/style-dots.svg" width="130" alt="Dots style">
+  <img src="docs/style-horizontal.svg" width="130" alt="Horizontal style">
+  <img src="docs/style-diagonal.svg" width="130" alt="Diagonal style">
+  <img src="docs/style-metro.svg" width="130" alt="Metro style">
+</p>
+
 ## What It Does
 
 - **Encode** — text to QR matrix, versions 1–40, error correction levels L/M/Q/H, numeric/alphanumeric/byte modes
 - **Multi-candidate** — returns multiple mask variants above a quality threshold so you can choose aesthetically, not just technically
-- **SVG rendering** — six visual styles, three corner treatments, two line widths, optional layer separation for fabrication
+- **SVG rendering** — eight visual styles, three corner treatments, two line widths, optional layer separation for fabrication
 - **PNG export** — browser-only `svgToPng()` renders via canvas, `downloadPng()` triggers a file download
 
 ## Install
@@ -41,8 +51,17 @@ import type { SvgStyle } from '@verevoir/qr';
 const results = encode('https://example.com');
 const qr = results[0];
 
-// All six styles from the same QR data
-const styles: SvgStyle[] = ['square', 'dots', 'horizontal', 'vertical', 'diagonal', 'grid'];
+// All eight styles from the same QR data
+const styles: SvgStyle[] = [
+  'square',
+  'dots',
+  'horizontal',
+  'vertical',
+  'diagonal',
+  'grid',
+  'tubemap',
+  'metro',
+];
 
 for (const style of styles) {
   const svg = toSvg(qr, { style, cornerStyle: 'round' });
@@ -80,50 +99,52 @@ await downloadPng(svg, { size: 1024, filename: 'qr-code.png' });
 
 ### Encoding
 
-| Export | Description |
-| --- | --- |
+| Export                   | Description                                                                                          |
+| ------------------------ | ---------------------------------------------------------------------------------------------------- |
 | `encode(text, options?)` | Encode text into QR matrix. Returns `QrResult[]` — multiple mask candidates sorted by penalty score. |
 
 ### Rendering
 
-| Export | Description |
-| --- | --- |
-| `toSvg(qrResult, options?)` | Render a QR result as an SVG string. |
-| `svgToPng(svg, options?)` | Convert SVG string to PNG blob (browser only). |
+| Export                       | Description                                             |
+| ---------------------------- | ------------------------------------------------------- |
+| `toSvg(qrResult, options?)`  | Render a QR result as an SVG string.                    |
+| `svgToPng(svg, options?)`    | Convert SVG string to PNG blob (browser only).          |
 | `downloadPng(svg, options?)` | Render to PNG and trigger file download (browser only). |
 
 ### Options
 
-| Type | Values | Default |
-| --- | --- | --- |
-| `SvgStyle` | `'square'` \| `'dots'` \| `'horizontal'` \| `'vertical'` \| `'diagonal'` \| `'grid'` | `'square'` |
-| `CornerStyle` | `'square'` \| `'rounded'` \| `'round'` | `'square'` |
-| `LineWidth` | `'normal'` \| `'thin'` | `'normal'` |
-| `ErrorLevel` | `'L'` \| `'M'` \| `'Q'` \| `'H'` | `'M'` |
+| Type          | Values                                                                               | Default    |
+| ------------- | ------------------------------------------------------------------------------------ | ---------- |
+| `SvgStyle`    | `'square'` \| `'dots'` \| `'horizontal'` \| `'vertical'` \| `'diagonal'` \| `'grid'` \| `'tubemap'` \| `'metro'` | `'square'` |
+| `CornerStyle` | `'square'` \| `'rounded'` \| `'round'`                                               | `'square'` |
+| `LineWidth`   | `'normal'` \| `'thin'`                                                               | `'normal'` |
+| `ErrorLevel`  | `'L'` \| `'M'` \| `'Q'` \| `'H'`                                                     | `'L'`      |
 
 ### SVG Styles
 
-| Style | Description |
-| --- | --- |
-| `square` | Filled rectangles per module |
-| `dots` | Dark and light circles on separate layers |
+| Style        | Description                                           |
+| ------------ | ----------------------------------------------------- |
+| `square`     | Filled rectangles per module                          |
+| `dots`       | Dark and light circles on separate layers             |
 | `horizontal` | Horizontal line segments for consecutive dark modules |
-| `vertical` | Vertical line segments for consecutive dark modules |
-| `diagonal` | Diagonal line segments in both directions |
-| `grid` | Connected dark regions traced as filled outline paths |
+| `vertical`   | Vertical line segments for consecutive dark modules   |
+| `diagonal`   | Diagonal line segments in both directions             |
+| `grid`       | Connected dark regions traced as filled outline paths |
+| `tubemap`    | Diagonal-first lines, then horizontal and vertical   |
+| `metro`      | Horizontal over vertical over diagonal layered lines  |
 
 ## Architecture
 
-| File | Responsibility |
-| --- | --- |
-| `src/types.ts` | Public interfaces: QrResult, SvgOptions, EncodeOptions |
-| `src/galois.ts` | GF(256) arithmetic, Reed-Solomon error correction |
-| `src/data.ts` | Encoding modes, data codewords, EC interleaving, version selection |
-| `src/matrix.ts` | QR matrix construction, module placement, format/version info |
-| `src/mask.ts` | Mask evaluation, penalty scoring, multi-candidate ranking |
-| `src/encode.ts` | Top-level `encode()` entry point |
-| `src/svg/` | SVG renderers (square, dots, horizontal, vertical, diagonal, grid, corners) |
-| `src/png.ts` | PNG export via browser canvas |
+| File            | Responsibility                                                              |
+| --------------- | --------------------------------------------------------------------------- |
+| `src/types.ts`  | Public interfaces: QrResult, SvgOptions, EncodeOptions                      |
+| `src/galois.ts` | GF(256) arithmetic, Reed-Solomon error correction                           |
+| `src/data.ts`   | Encoding modes, data codewords, EC interleaving, version selection          |
+| `src/matrix.ts` | QR matrix construction, module placement, format/version info               |
+| `src/mask.ts`   | Mask evaluation, penalty scoring, multi-candidate ranking                   |
+| `src/encode.ts` | Top-level `encode()` entry point                                            |
+| `src/svg/`      | SVG renderers (square, dots, horizontal, vertical, diagonal, grid, corners) |
+| `src/png.ts`    | PNG export via browser canvas                                               |
 
 ## Design Decisions
 
