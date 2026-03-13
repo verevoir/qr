@@ -100,40 +100,40 @@ await downloadPng(svg, { size: 1024, filename: 'qr-code.png' });
 
 ### Options
 
-| Type          | Values                                                                                                           | Default    |
-| ------------- | ---------------------------------------------------------------------------------------------------------------- | ---------- |
+| Type          | Values                                                                                                                                             | Default    |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
 | `SvgStyle`    | `'square'` \| `'dots'` \| `'horizontal'` \| `'vertical'` \| `'diagonal'` \| `'grid'` \| `'lines'` \| `'metro'` \| `'scribble'` \| `'scribble-alt'` | `'square'` |
-| `CornerStyle` | `'square'` \| `'rounded'` \| `'round'`                                                                           | `'square'` |
-| `LineWidth`   | `'normal'` \| `'thin'`                                                                                           | `'normal'` |
-| `ErrorLevel`  | `'L'` \| `'M'` \| `'Q'` \| `'H'`                                                                                 | `'L'`      |
+| `CornerStyle` | `'square'` \| `'rounded'` \| `'round'`                                                                                                             | `'square'` |
+| `LineWidth`   | `'normal'` \| `'thin'`                                                                                                                             | `'normal'` |
+| `ErrorLevel`  | `'L'` \| `'M'` \| `'Q'` \| `'H'`                                                                                                                   | `'L'`      |
 
 ### SVG Styles
 
-| Style        | Description                                           |
-| ------------ | ----------------------------------------------------- |
-| `square`     | Filled rectangles per module                          |
-| `dots`       | Dark and light circles on separate layers             |
-| `horizontal` | Horizontal line segments for consecutive dark modules |
-| `vertical`   | Vertical line segments for consecutive dark modules   |
-| `diagonal`   | Diagonal line segments in both directions             |
-| `grid`       | Connected dark regions traced as filled outline paths |
-| `lines`        | Diagonal-first tubemap-style paths, then horizontal and vertical |
-| `metro`        | Horizontal over vertical over diagonal layered lines  |
+| Style          | Description                                                                |
+| -------------- | -------------------------------------------------------------------------- |
+| `square`       | Filled rectangles per module                                               |
+| `dots`         | Dark and light circles on separate layers                                  |
+| `horizontal`   | Horizontal line segments for consecutive dark modules                      |
+| `vertical`     | Vertical line segments for consecutive dark modules                        |
+| `diagonal`     | Diagonal line segments in both directions                                  |
+| `grid`         | Connected dark regions traced as filled outline paths                      |
+| `lines`        | Diagonal-first tubemap-style paths, then horizontal and vertical           |
+| `metro`        | Horizontal over vertical over diagonal layered lines                       |
 | `scribble`     | Connected component walking with diagonal zigzag and bezier-smoothed turns |
-| `scribble-alt` | Connected component walking with horizontal zigzag and angular turns |
+| `scribble-alt` | Connected component walking with horizontal zigzag and angular turns       |
 
 ## Architecture
 
-| File            | Responsibility                                                              |
-| --------------- | --------------------------------------------------------------------------- |
-| `src/types.ts`  | Public interfaces: QrResult, SvgOptions, EncodeOptions                      |
-| `src/galois.ts` | GF(256) arithmetic, Reed-Solomon error correction                           |
-| `src/data.ts`   | Encoding modes, data codewords, EC interleaving, version selection          |
-| `src/matrix.ts` | QR matrix construction, module placement, format/version info               |
-| `src/mask.ts`   | Mask evaluation, penalty scoring, multi-candidate ranking                   |
-| `src/encode.ts` | Top-level `encode()` entry point                                            |
+| File            | Responsibility                                                                                                    |
+| --------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `src/types.ts`  | Public interfaces: QrResult, SvgOptions, EncodeOptions                                                            |
+| `src/galois.ts` | GF(256) arithmetic, Reed-Solomon error correction                                                                 |
+| `src/data.ts`   | Encoding modes, data codewords, EC interleaving, version selection                                                |
+| `src/matrix.ts` | QR matrix construction, module placement, format/version info                                                     |
+| `src/mask.ts`   | Mask evaluation, penalty scoring, multi-candidate ranking                                                         |
+| `src/encode.ts` | Top-level `encode()` entry point                                                                                  |
 | `src/svg/`      | SVG renderers (square, dots, horizontal, vertical, diagonal, grid, lines, metro, scribble, scribble-alt, corners) |
-| `src/png.ts`    | PNG export via browser canvas                                               |
+| `src/png.ts`    | PNG export via browser canvas                                                                                     |
 
 ## Design Decisions
 

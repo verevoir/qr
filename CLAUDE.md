@@ -11,18 +11,18 @@ QR code encoding engine and SVG renderers. Turns text into scannable QR codes wi
 
 ## SVG Styles
 
-| Style | Description |
-|-------|-------------|
-| `square` | Simple filled squares per module (default) |
-| `dots` | Small round dots — both dark and light on separate layers |
-| `horizontal` | Horizontal line segments for consecutive dark modules |
-| `vertical` | Vertical line segments for consecutive dark modules |
-| `diagonal` | Diagonal line segments (both `\` and `/` directions) |
-| `grid` | Connected dark regions traced as filled outline paths |
-| `lines` | Diagonal-first tubemap-style paths, then horizontal and vertical |
-| `metro` | Horizontal over vertical over diagonal layered lines |
-| `scribble` | Connected component walking with diagonal zigzag and bezier-smoothed turns |
-| `scribble-alt` | Connected component walking with horizontal zigzag and angular turns |
+| Style          | Description                                                                |
+| -------------- | -------------------------------------------------------------------------- |
+| `square`       | Simple filled squares per module (default)                                 |
+| `dots`         | Small round dots — both dark and light on separate layers                  |
+| `horizontal`   | Horizontal line segments for consecutive dark modules                      |
+| `vertical`     | Vertical line segments for consecutive dark modules                        |
+| `diagonal`     | Diagonal line segments (both `\` and `/` directions)                       |
+| `grid`         | Connected dark regions traced as filled outline paths                      |
+| `lines`        | Diagonal-first tubemap-style paths, then horizontal and vertical           |
+| `metro`        | Horizontal over vertical over diagonal layered lines                       |
+| `scribble`     | Connected component walking with diagonal zigzag and bezier-smoothed turns |
+| `scribble-alt` | Connected component walking with horizontal zigzag and angular turns       |
 
 ## Corner Styles
 
