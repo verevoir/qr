@@ -1,10 +1,10 @@
 # @verevoir/qr
 
-Text to QR code in TypeScript. Eight SVG styles, zero dependencies.
+Text to QR code in TypeScript. Ten SVG styles, zero dependencies.
 
 ## Styles
 
-There are a number fo style variations but these are some examples.
+There are a number of style variations but these are some examples.
 | squares | dots<br />(photo overlay) | horizontal | diagonal | metro |
 | --- | --- | --- | --- | --- |
 | <img src="docs/style-square.svg" width="130" alt="Square style"> | <img src="docs/style-dots.svg" width="130" alt="Square style"> | <img src="docs/style-horizontal.svg" width="130" alt="Horizontal style"> | <img src="docs/style-diagonal.svg" width="130" alt="Square style"> | <img src="docs/style-metro.svg" width="130" alt="Square style"> |
@@ -13,7 +13,7 @@ There are a number fo style variations but these are some examples.
 
 - **Encode** — text in, QR matrix out. Versions 1–40, all four error correction levels, auto mode selection.
 - **Multiple masks** — gives you several mask variants ranked by quality, so you pick the one that looks best for your use case.
-- **SVG rendering** — eight styles, three corner shapes, two line weights. Most styles output closed paths directly.
+- **SVG rendering** — ten styles, three corner shapes, two line weights. Most styles output closed paths directly.
 - **PNG export** — `svgToPng()` and `downloadPng()` for browser use. No server needed.
 
 ## Install
@@ -48,7 +48,7 @@ import type { SvgStyle } from '@verevoir/qr';
 const results = encode('https://example.com');
 const qr = results[0];
 
-// All eight styles from the same QR data
+// All ten styles from the same QR data
 const styles: SvgStyle[] = [
   'square',
   'dots',
@@ -56,8 +56,10 @@ const styles: SvgStyle[] = [
   'vertical',
   'diagonal',
   'grid',
-  'tubemap',
+  'lines',
   'metro',
+  'scribble',
+  'scribble-alt',
 ];
 
 for (const style of styles) {
@@ -100,7 +102,7 @@ await downloadPng(svg, { size: 1024, filename: 'qr-code.png' });
 
 | Type          | Values                                                                                                           | Default    |
 | ------------- | ---------------------------------------------------------------------------------------------------------------- | ---------- |
-| `SvgStyle`    | `'square'` \| `'dots'` \| `'horizontal'` \| `'vertical'` \| `'diagonal'` \| `'grid'` \| `'tubemap'` \| `'metro'` | `'square'` |
+| `SvgStyle`    | `'square'` \| `'dots'` \| `'horizontal'` \| `'vertical'` \| `'diagonal'` \| `'grid'` \| `'lines'` \| `'metro'` \| `'scribble'` \| `'scribble-alt'` | `'square'` |
 | `CornerStyle` | `'square'` \| `'rounded'` \| `'round'`                                                                           | `'square'` |
 | `LineWidth`   | `'normal'` \| `'thin'`                                                                                           | `'normal'` |
 | `ErrorLevel`  | `'L'` \| `'M'` \| `'Q'` \| `'H'`                                                                                 | `'L'`      |
@@ -115,8 +117,10 @@ await downloadPng(svg, { size: 1024, filename: 'qr-code.png' });
 | `vertical`   | Vertical line segments for consecutive dark modules   |
 | `diagonal`   | Diagonal line segments in both directions             |
 | `grid`       | Connected dark regions traced as filled outline paths |
-| `tubemap`    | Diagonal-first lines, then horizontal and vertical    |
-| `metro`      | Horizontal over vertical over diagonal layered lines  |
+| `lines`        | Diagonal-first tubemap-style paths, then horizontal and vertical |
+| `metro`        | Horizontal over vertical over diagonal layered lines  |
+| `scribble`     | Connected component walking with diagonal zigzag and bezier-smoothed turns |
+| `scribble-alt` | Connected component walking with horizontal zigzag and angular turns |
 
 ## Architecture
 
@@ -128,7 +132,7 @@ await downloadPng(svg, { size: 1024, filename: 'qr-code.png' });
 | `src/matrix.ts` | QR matrix construction, module placement, format/version info               |
 | `src/mask.ts`   | Mask evaluation, penalty scoring, multi-candidate ranking                   |
 | `src/encode.ts` | Top-level `encode()` entry point                                            |
-| `src/svg/`      | SVG renderers (square, dots, horizontal, vertical, diagonal, grid, corners) |
+| `src/svg/`      | SVG renderers (square, dots, horizontal, vertical, diagonal, grid, lines, metro, scribble, scribble-alt, corners) |
 | `src/png.ts`    | PNG export via browser canvas                                               |
 
 ## Design Decisions

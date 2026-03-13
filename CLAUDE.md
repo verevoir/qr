@@ -6,7 +6,7 @@ QR code encoding engine and SVG renderers. Turns text into scannable QR codes wi
 
 - **Encode** — text to QR matrix. Supports versions 1-40, error correction levels L/M/Q/H, numeric/alphanumeric/byte encoding modes.
 - **Multi-candidate** — returns multiple mask variants above a quality threshold (default: within 30% of best penalty score) so consumers can pick aesthetically.
-- **SVG rendering** — six visual styles, three corner styles, line width options, optional layer separation for 3D printing/laser cutting.
+- **SVG rendering** — ten visual styles, three corner styles, line width options, optional layer separation for 3D printing/laser cutting.
 - **PNG export** — browser-only `svgToPng()` renders SVG to PNG via canvas. `downloadPng()` convenience helper triggers a file download. Zero dependencies — uses native browser APIs.
 
 ## SVG Styles
@@ -19,6 +19,10 @@ QR code encoding engine and SVG renderers. Turns text into scannable QR codes wi
 | `vertical` | Vertical line segments for consecutive dark modules |
 | `diagonal` | Diagonal line segments (both `\` and `/` directions) |
 | `grid` | Connected dark regions traced as filled outline paths |
+| `lines` | Diagonal-first tubemap-style paths, then horizontal and vertical |
+| `metro` | Horizontal over vertical over diagonal layered lines |
+| `scribble` | Connected component walking with diagonal zigzag and bezier-smoothed turns |
+| `scribble-alt` | Connected component walking with horizontal zigzag and angular turns |
 
 ## Corner Styles
 
@@ -45,7 +49,7 @@ npm install
 - `src/matrix.ts` — QR matrix construction, module placement, format/version info
 - `src/mask.ts` — mask evaluation, penalty scoring, multi-candidate ranking
 - `src/encode.ts` — top-level `encode()` entry point
-- `src/svg/` — SVG renderers (square, dots, horizontal, vertical, diagonal, grid, corners)
+- `src/svg/` — SVG renderers (square, dots, horizontal, vertical, diagonal, grid, lines, metro, scribble, scribble-alt, corners)
 - `src/png.ts` — PNG export via browser canvas (`svgToPng`, `downloadPng`)
 - `src/types.ts` — public type definitions
 
