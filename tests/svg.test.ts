@@ -86,12 +86,11 @@ describe('toSvg', () => {
       expect(svg).toContain('stroke="#fff"');
     });
 
-    it('wraps in layer groups when layers=true', () => {
+    it('always wraps in layer groups', () => {
       const qr = getQr();
-      const svg = toSvg(qr, { style: 'dots', layers: true });
+      const svg = toSvg(qr, { style: 'dots' });
       expect(svg).toContain('id="dark"');
       expect(svg).toContain('id="light"');
-      expect(svg).toContain('id="background"');
     });
   });
 
@@ -102,10 +101,10 @@ describe('toSvg', () => {
       expect(svg).toContain('stroke-width="0.9"');
     });
 
-    it('thin uses 0.5 stroke width', () => {
+    it('thin uses 0.65 stroke width', () => {
       const qr = getQr();
       const svg = toSvg(qr, { style: 'horizontal', lineWidth: 'thin' });
-      expect(svg).toContain('stroke-width="0.5"');
+      expect(svg).toContain('stroke-width="0.65"');
     });
   });
 

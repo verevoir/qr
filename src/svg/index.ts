@@ -14,6 +14,7 @@ import { renderVertical } from './vertical.js';
 import { renderDiagonal } from './diagonal.js';
 import { renderGrid } from './grid.js';
 import { renderTubemap, renderMetro } from './tubemap.js';
+import { renderScribble, renderMetroScribble } from './scribble.js';
 
 export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
   const style: SvgStyle = options?.style ?? 'square';
@@ -42,11 +43,17 @@ export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
     case 'grid':
       content += renderGrid(qr);
       break;
-    case 'tubemap':
+    case 'lines':
       content += renderTubemap(qr, lineWidth);
       break;
     case 'metro':
       content += renderMetro(qr, lineWidth);
+      break;
+    case 'scribble':
+      content += renderScribble(qr, lineWidth);
+      break;
+    case 'scribble-alt':
+      content += renderMetroScribble(qr, lineWidth);
       break;
     case 'square':
     default:

@@ -7,8 +7,10 @@ export type SvgStyle =
   | 'vertical'
   | 'diagonal'
   | 'grid'
-  | 'tubemap'
-  | 'metro';
+  | 'lines'
+  | 'metro'
+  | 'scribble'
+  | 'scribble-alt';
 
 export type CornerStyle = 'square' | 'rounded' | 'round';
 
