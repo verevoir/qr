@@ -1,6 +1,6 @@
 {
   "name": "@verevoir/qr",
-  "version": "0.1.0-alpha.7",
+  "version": "0.1.0-alpha.9",
   "description": "QR code encoding engine and SVG renderers — multiple visual styles with zero dependencies",
   "homepage": "https://verevoir.io",
   "license": "MIT",
