@@ -181,9 +181,7 @@ function walkComponent(
   const memberSet = new Set(component.map((p) => p.row * size + p.col));
   const visited = new Set<number>();
 
-  const sorted = [...component].sort(
-    (a, b) => a.row - b.row || a.col - b.col,
-  );
+  const sorted = [...component].sort((a, b) => a.row - b.row || a.col - b.col);
 
   const paths: Pt[][] = [];
 
@@ -198,14 +196,7 @@ function walkComponent(
     let preferA = true;
 
     while (true) {
-      const next = pickNext(
-        current,
-        preferA,
-        config,
-        memberSet,
-        visited,
-        size,
-      );
+      const next = pickNext(current, preferA, config, memberSet, visited, size);
       if (!next) break;
 
       const dr = next.row - current.row;
@@ -345,6 +336,9 @@ export function renderScribble(qr: QrMatrix, lineWidth: LineWidth): string {
   return renderWithConfig(qr, lineWidth, SCRIBBLE_CONFIG);
 }
 
-export function renderMetroScribble(qr: QrMatrix, lineWidth: LineWidth): string {
+export function renderMetroScribble(
+  qr: QrMatrix,
+  lineWidth: LineWidth,
+): string {
   return renderWithConfig(qr, lineWidth, METRO_CONFIG);
 }

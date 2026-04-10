@@ -98,14 +98,10 @@ function traceOutline(cells: Set<string>, cornerRadius: number): string | null {
 
   for (const key of cells) {
     const [r, c] = key.split(',').map(Number);
-    if (!has(r - 1, c))
-      edges.push({ x1: c, y1: r, x2: c + 1, y2: r }); // top
-    if (!has(r, c + 1))
-      edges.push({ x1: c + 1, y1: r, x2: c + 1, y2: r + 1 }); // right
-    if (!has(r + 1, c))
-      edges.push({ x1: c + 1, y1: r + 1, x2: c, y2: r + 1 }); // bottom
-    if (!has(r, c - 1))
-      edges.push({ x1: c, y1: r + 1, x2: c, y2: r }); // left
+    if (!has(r - 1, c)) edges.push({ x1: c, y1: r, x2: c + 1, y2: r }); // top
+    if (!has(r, c + 1)) edges.push({ x1: c + 1, y1: r, x2: c + 1, y2: r + 1 }); // right
+    if (!has(r + 1, c)) edges.push({ x1: c + 1, y1: r + 1, x2: c, y2: r + 1 }); // bottom
+    if (!has(r, c - 1)) edges.push({ x1: c, y1: r + 1, x2: c, y2: r }); // left
   }
 
   // Index edges by start vertex
