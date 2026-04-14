@@ -204,7 +204,7 @@ describe('toSvg', () => {
       expect(svg).toContain('fill="#000"');
     });
 
-    it("outline respects cornerStyle option", () => {
+    it('outline respects cornerStyle option', () => {
       const qr = getQr();
       const svgRound = toSvg(qr, { style: 'outline', cornerStyle: 'round' });
       // Round corners render finder circles not rects

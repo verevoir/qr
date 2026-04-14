@@ -38,12 +38,16 @@ describe('encode', () => {
 
   describe('boostErrorCorrection', () => {
     it('always produces H-level error correction', () => {
-      const results = encode('https://example.com', { boostErrorCorrection: true });
+      const results = encode('https://example.com', {
+        boostErrorCorrection: true,
+      });
       expect(results[0].errorLevel).toBe('H');
     });
 
     it('is equivalent to minErrorLevel H', () => {
-      const boosted = encode('https://example.com', { boostErrorCorrection: true });
+      const boosted = encode('https://example.com', {
+        boostErrorCorrection: true,
+      });
       const explicit = encode('https://example.com', { minErrorLevel: 'H' });
       expect(boosted[0].version).toBe(explicit[0].version);
       expect(boosted[0].errorLevel).toBe(explicit[0].errorLevel);
@@ -52,12 +56,19 @@ describe('encode', () => {
     it('may use a larger version than the default to achieve H level', () => {
       // Find text that fits in a smaller version at L/M but needs a larger one
       // for H. The long URL requires more capacity; with boost it may step up.
-      const defaultResult = encode('https://tickets.example.com/e/summer-conf-2026?src=qr&medium=badge');
-      const boostedResult = encode('https://tickets.example.com/e/summer-conf-2026?src=qr&medium=badge', {
-        boostErrorCorrection: true,
-      });
+      const defaultResult = encode(
+        'https://tickets.example.com/e/summer-conf-2026?src=qr&medium=badge',
+      );
+      const boostedResult = encode(
+        'https://tickets.example.com/e/summer-conf-2026?src=qr&medium=badge',
+        {
+          boostErrorCorrection: true,
+        },
+      );
       expect(boostedResult[0].errorLevel).toBe('H');
-      expect(boostedResult[0].version).toBeGreaterThanOrEqual(defaultResult[0].version);
+      expect(boostedResult[0].version).toBeGreaterThanOrEqual(
+        defaultResult[0].version,
+      );
     });
   });
 

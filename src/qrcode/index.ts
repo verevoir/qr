@@ -46,12 +46,7 @@
 
 import { encode } from '../encode.js';
 import { toSvg } from '../svg/index.js';
-import type {
-  ErrorLevel,
-  QrMatrix,
-  QrResult,
-  SvgOptions,
-} from '../types.js';
+import type { ErrorLevel, QrMatrix, QrResult, SvgOptions } from '../types.js';
 
 /** node-style callback: `(err, result)`. Error is `null` on success. */
 export type Callback<T = void> = (err: Error | null, result?: T) => void;
@@ -104,12 +99,8 @@ export function create(
 // toString
 // ---------------------------------------------------------------------------
 
-/* eslint-disable no-redeclare */
 export function toString(text: string): Promise<string>;
-export function toString(
-  text: string,
-  options: QRCodeOptions,
-): Promise<string>;
+export function toString(text: string, options: QRCodeOptions): Promise<string>;
 export function toString(text: string, cb: Callback<string>): void;
 export function toString(
   text: string,
@@ -144,7 +135,6 @@ export function toString(
   }
   return Promise.resolve(result);
 }
-/* eslint-enable no-redeclare */
 
 export default { create, toString };
 

@@ -40,10 +40,7 @@ export function createSvgElement(svgString: string): SVGSVGElement {
  * Convenience wrapper around `container.innerHTML = svgString` that
  * guards against a non-browser environment.
  */
-export function renderIntoElement(
-  container: Element,
-  svgString: string,
-): void {
+export function renderIntoElement(container: Element, svgString: string): void {
   if (typeof document === 'undefined') {
     throw new Error('renderIntoElement: requires a browser environment');
   }

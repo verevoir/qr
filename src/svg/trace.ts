@@ -686,11 +686,9 @@ function findComponents(cells: CellSet, diagonals: boolean): CellSet[] {
       visited.add(key);
       component.add(key);
       const [r, c] = parseCellKey(key);
-      for (const [nr, nc] of clockwiseNeighbours(
-        [r, c],
-        cells,
-        { diagonals },
-      )) {
+      for (const [nr, nc] of clockwiseNeighbours([r, c], cells, {
+        diagonals,
+      })) {
         const nk = cellKey(nr, nc);
         if (!visited.has(nk)) stack.push(nk);
       }
@@ -880,10 +878,7 @@ export function findSaddles(
  * - `/` saddle: NE cell's SW corner chamfer runs NW; SW cell's NE
  *   corner chamfer runs SE.
  */
-function buildChamferedBoundary(
-  component: CellSet,
-  notch: number,
-): DualEdge[] {
+function buildChamferedBoundary(component: CellSet, notch: number): DualEdge[] {
   const saddles = findSaddles(component);
   const edges: DualEdge[] = [];
   for (const key of component) {
@@ -982,9 +977,7 @@ function chainIntoLoops(edges: readonly DualEdge[]): Vertex[][] {
     while (cur && !used.has(cur)) {
       used.add(cur);
       pts.push([cur.x2, cur.y2]);
-      cur = byStart
-        .get(`${cur.x2},${cur.y2}`)
-        ?.find((e) => !used.has(e));
+      cur = byStart.get(`${cur.x2},${cur.y2}`)?.find((e) => !used.has(e));
     }
     // Chain returns to start — drop the duplicate closing vertex.
     if (pts.length >= 2) {

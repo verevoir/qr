@@ -27,18 +27,13 @@ export type { Callback, QRCodeOptions };
 // toFile
 // ---------------------------------------------------------------------------
 
-/* eslint-disable no-redeclare */
 export function toFile(path: string, text: string): Promise<void>;
 export function toFile(
   path: string,
   text: string,
   options: QRCodeOptions,
 ): Promise<void>;
-export function toFile(
-  path: string,
-  text: string,
-  cb: Callback<void>,
-): void;
+export function toFile(path: string, text: string, cb: Callback<void>): void;
 export function toFile(
   path: string,
   text: string,
@@ -55,7 +50,6 @@ export function toFile(
   const promise = writeFileFromOptions(path, text, options);
   return handle(promise, cb);
 }
-/* eslint-enable no-redeclare */
 
 async function writeFileFromOptions(
   path: string,
@@ -80,12 +74,8 @@ async function writeFileFromOptions(
 // toBuffer — defaults to PNG to match node-qrcode
 // ---------------------------------------------------------------------------
 
-/* eslint-disable no-redeclare */
 export function toBuffer(text: string): Promise<Buffer>;
-export function toBuffer(
-  text: string,
-  options: QRCodeOptions,
-): Promise<Buffer>;
+export function toBuffer(text: string, options: QRCodeOptions): Promise<Buffer>;
 export function toBuffer(text: string, cb: Callback<Buffer>): void;
 export function toBuffer(
   text: string,
@@ -101,7 +91,6 @@ export function toBuffer(
   const promise = bufferFromOptions(text, options);
   return handle(promise, cb);
 }
-/* eslint-enable no-redeclare */
 
 async function bufferFromOptions(
   text: string,
@@ -115,7 +104,6 @@ async function bufferFromOptions(
 // toDataURL — PNG data: URL, matching node-qrcode's default
 // ---------------------------------------------------------------------------
 
-/* eslint-disable no-redeclare */
 export function toDataURL(text: string): Promise<string>;
 export function toDataURL(
   text: string,
@@ -136,7 +124,6 @@ export function toDataURL(
   const promise = dataUrlFromOptions(text, options);
   return handle(promise, cb);
 }
-/* eslint-enable no-redeclare */
 
 async function dataUrlFromOptions(
   text: string,

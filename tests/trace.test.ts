@@ -55,11 +55,7 @@ describe('clockwiseNeighbours', () => {
 
   it('4-connected: returns present neighbours in E, S, W, N order', () => {
     // All four cardinal neighbours of (1,1) present
-    const cells = grid([
-      '.X.',
-      'XXX',
-      '.X.',
-    ]);
+    const cells = grid(['.X.', 'XXX', '.X.']);
     expect(clockwiseNeighbours([1, 1], cells)).toEqual([
       [1, 2], // E
       [2, 1], // S
@@ -70,11 +66,7 @@ describe('clockwiseNeighbours', () => {
 
   it('4-connected: skips missing neighbours but preserves order', () => {
     // Only N and W present — E and S absent
-    const cells = grid([
-      '.X.',
-      'XX.',
-      '...',
-    ]);
+    const cells = grid(['.X.', 'XX.', '...']);
     expect(clockwiseNeighbours([1, 1], cells)).toEqual([
       [1, 0], // W
       [0, 1], // N
@@ -82,20 +74,12 @@ describe('clockwiseNeighbours', () => {
   });
 
   it('4-connected: ignores diagonally-adjacent cells', () => {
-    const cells = grid([
-      'X.X',
-      '.X.',
-      'X.X',
-    ]);
+    const cells = grid(['X.X', '.X.', 'X.X']);
     expect(clockwiseNeighbours([1, 1], cells)).toEqual([]);
   });
 
   it('8-connected: full ring visits NE, E, SE, S, SW, W, NW, N in order', () => {
-    const cells = grid([
-      'XXX',
-      'XXX',
-      'XXX',
-    ]);
+    const cells = grid(['XXX', 'XXX', 'XXX']);
     expect(clockwiseNeighbours([1, 1], cells, { diagonals: true })).toEqual([
       [0, 2], // NE
       [1, 2], // E
@@ -109,11 +93,7 @@ describe('clockwiseNeighbours', () => {
   });
 
   it('8-connected: only diagonals present, cardinals absent', () => {
-    const cells = grid([
-      'X.X',
-      '.X.',
-      'X.X',
-    ]);
+    const cells = grid(['X.X', '.X.', 'X.X']);
     expect(clockwiseNeighbours([1, 1], cells, { diagonals: true })).toEqual([
       [0, 2], // NE
       [2, 2], // SE
@@ -124,10 +104,7 @@ describe('clockwiseNeighbours', () => {
 
   it('handles edge cells with out-of-bounds neighbours', () => {
     // Corner cell at (0,0) — N, W, NW, NE, SW are all out of bounds
-    const cells = grid([
-      'XX',
-      'XX',
-    ]);
+    const cells = grid(['XX', 'XX']);
     expect(clockwiseNeighbours([0, 0], cells, { diagonals: true })).toEqual([
       [0, 1], // E
       [1, 1], // SE
@@ -177,13 +154,7 @@ describe('trace — straight lines', () => {
 
   it('4-cell horizontal line offset from origin', () => {
     // .XXXX in row 2 → starts at col 1, spans cols 1..4
-    expect(
-      trace(grid([
-        '.....',
-        '.....',
-        '.XXXX',
-      ])),
-    ).toEqual([
+    expect(trace(grid(['.....', '.....', '.XXXX']))).toEqual([
       [
         [1, 2.5],
         [5, 2.5],
@@ -201,11 +172,7 @@ describe('trace — straight lines', () => {
   });
 
   it('3-cell \\ diagonal line (diagonals enabled)', () => {
-    const cells = grid([
-      'X..',
-      '.X.',
-      '..X',
-    ]);
+    const cells = grid(['X..', '.X.', '..X']);
     expect(trace(cells, { diagonals: true })).toEqual([
       [
         [0, 0],
@@ -215,11 +182,7 @@ describe('trace — straight lines', () => {
   });
 
   it('3-cell / diagonal line (diagonals enabled) — first edge SW', () => {
-    const cells = grid([
-      '..X',
-      '.X.',
-      'X..',
-    ]);
+    const cells = grid(['..X', '.X.', 'X..']);
     // Endpoints are NE corner of (0,2) = (3, 0) and SW corner of (2,0) = (0, 3)
     expect(trace(cells, { diagonals: true })).toEqual([
       [
@@ -230,10 +193,7 @@ describe('trace — straight lines', () => {
   });
 
   it('2-cell \\ diagonal line', () => {
-    const cells = grid([
-      'X.',
-      '.X',
-    ]);
+    const cells = grid(['X.', '.X']);
     expect(trace(cells, { diagonals: true })).toEqual([
       [
         [0, 0],
@@ -270,10 +230,7 @@ describe('trace — straight lines', () => {
 
 describe('trace — triangles (3-cell L, diagonals enabled)', () => {
   it('missing SE cell → NW, NE, SW vertices', () => {
-    const cells = grid([
-      'XX',
-      'X.',
-    ]);
+    const cells = grid(['XX', 'X.']);
     expect(trace(cells, { diagonals: true })).toEqual([
       [
         [0, 0], // NW
@@ -284,10 +241,7 @@ describe('trace — triangles (3-cell L, diagonals enabled)', () => {
   });
 
   it('missing SW cell → NW, NE, SE vertices', () => {
-    const cells = grid([
-      'XX',
-      '.X',
-    ]);
+    const cells = grid(['XX', '.X']);
     expect(trace(cells, { diagonals: true })).toEqual([
       [
         [0, 0],
@@ -298,10 +252,7 @@ describe('trace — triangles (3-cell L, diagonals enabled)', () => {
   });
 
   it('missing NE cell → NW, SE, SW vertices', () => {
-    const cells = grid([
-      'X.',
-      'XX',
-    ]);
+    const cells = grid(['X.', 'XX']);
     expect(trace(cells, { diagonals: true })).toEqual([
       [
         [0, 0],
@@ -312,10 +263,7 @@ describe('trace — triangles (3-cell L, diagonals enabled)', () => {
   });
 
   it('missing NW cell → NE, SE, SW vertices', () => {
-    const cells = grid([
-      '.X',
-      'XX',
-    ]);
+    const cells = grid(['.X', 'XX']);
     expect(trace(cells, { diagonals: true })).toEqual([
       [
         [2, 0],
@@ -456,11 +404,7 @@ describe('trace — solid rectangles', () => {
 
 describe('trace — X saddle', () => {
   it('classic X at the origin (5 cells, diagonals on)', () => {
-    const cells = grid([
-      'X.X',
-      '.X.',
-      'X.X',
-    ]);
+    const cells = grid(['X.X', '.X.', 'X.X']);
     expect(trace(cells, { diagonals: true })).toEqual([
       [
         [0, 0],
@@ -499,20 +443,12 @@ describe('trace — X saddle', () => {
   });
 
   it('X without diagonals is 5 disconnected cells — Stage 8 yields 5 squares', () => {
-    const cells = grid([
-      'X.X',
-      '.X.',
-      'X.X',
-    ]);
+    const cells = grid(['X.X', '.X.', 'X.X']);
     expect(trace(cells)).toHaveLength(5);
   });
 
   it('X with missing centre becomes 4 separate cells', () => {
-    const cells = grid([
-      'X.X',
-      '...',
-      'X.X',
-    ]);
+    const cells = grid(['X.X', '...', 'X.X']);
     // diagonals doesn't reconnect them — cells share no edge or corner
     // via the (absent) centre
     expect(trace(cells, { diagonals: true })).toHaveLength(4);
@@ -553,7 +489,9 @@ describe('trace — X saddle', () => {
 // renderer relies on.
 // ---------------------------------------------------------------------------
 
-function signedAreaDoubled(path: readonly (readonly [number, number])[]): number {
+function signedAreaDoubled(
+  path: readonly (readonly [number, number])[],
+): number {
   // Σ x_i * (y_{i+1} - y_{i-1}) — positive = CW in SVG screen (y-down)
   let sum = 0;
   const n = path.length;
@@ -568,41 +506,58 @@ function signedAreaDoubled(path: readonly (readonly [number, number])[]): number
 
 describe('trace — rectangular rings (O-shapes)', () => {
   it('3x3 ring with 1x1 hole', () => {
-    const cells = grid([
-      'XXX',
-      'X.X',
-      'XXX',
-    ]);
+    const cells = grid(['XXX', 'X.X', 'XXX']);
     expect(trace(cells)).toEqual([
       // Outer CW
-      [[0, 0], [3, 0], [3, 3], [0, 3]],
+      [
+        [0, 0],
+        [3, 0],
+        [3, 3],
+        [0, 3],
+      ],
       // Inner CCW — NW → SW → SE → NE
-      [[1, 1], [1, 2], [2, 2], [2, 1]],
+      [
+        [1, 1],
+        [1, 2],
+        [2, 2],
+        [2, 1],
+      ],
     ]);
   });
 
   it('4x4 ring with 2x2 hole', () => {
-    const cells = grid([
-      'XXXX',
-      'X..X',
-      'X..X',
-      'XXXX',
-    ]);
+    const cells = grid(['XXXX', 'X..X', 'X..X', 'XXXX']);
     expect(trace(cells)).toEqual([
-      [[0, 0], [4, 0], [4, 4], [0, 4]],
-      [[1, 1], [1, 3], [3, 3], [3, 1]],
+      [
+        [0, 0],
+        [4, 0],
+        [4, 4],
+        [0, 4],
+      ],
+      [
+        [1, 1],
+        [1, 3],
+        [3, 3],
+        [3, 1],
+      ],
     ]);
   });
 
   it('5x3 ring with 3x1 hole (wide slot)', () => {
-    const cells = grid([
-      'XXXXX',
-      'X...X',
-      'XXXXX',
-    ]);
+    const cells = grid(['XXXXX', 'X...X', 'XXXXX']);
     expect(trace(cells)).toEqual([
-      [[0, 0], [5, 0], [5, 3], [0, 3]],
-      [[1, 1], [1, 2], [4, 2], [4, 1]],
+      [
+        [0, 0],
+        [5, 0],
+        [5, 3],
+        [0, 3],
+      ],
+      [
+        [1, 1],
+        [1, 2],
+        [4, 2],
+        [4, 1],
+      ],
     ]);
   });
 
@@ -615,8 +570,18 @@ describe('trace — rectangular rings (O-shapes)', () => {
       }
     }
     expect(trace(cells)).toEqual([
-      [[6, 4], [9, 4], [9, 7], [6, 7]],
-      [[7, 5], [7, 6], [8, 6], [8, 5]],
+      [
+        [6, 4],
+        [9, 4],
+        [9, 7],
+        [6, 7],
+      ],
+      [
+        [7, 5],
+        [7, 6],
+        [8, 6],
+        [8, 5],
+      ],
     ]);
   });
 
@@ -628,11 +593,7 @@ describe('trace — rectangular rings (O-shapes)', () => {
 
   it('hole touching bounding-box edge is not a ring — Stage 8 outlines the shape', () => {
     // Missing top-right cell: Stage 8 traces as a 6-vertex L outline
-    const cells = grid([
-      'XX.',
-      'XXX',
-      'XXX',
-    ]);
+    const cells = grid(['XX.', 'XXX', 'XXX']);
     const paths = trace(cells);
     expect(paths).toHaveLength(1);
     expect(paths[0]).toHaveLength(6);
@@ -657,33 +618,21 @@ describe('trace — Stage 8 fallback', () => {
   });
 
   it('plus sign (+) is one 12-vertex clockwise outline', () => {
-    const cells = grid([
-      '.X.',
-      'XXX',
-      '.X.',
-    ]);
+    const cells = grid(['.X.', 'XXX', '.X.']);
     const [path] = trace(cells);
     expect(path).toHaveLength(12);
     expect(signedAreaDoubled(path)).toBeGreaterThan(0);
   });
 
   it('T-shape is one clockwise outline', () => {
-    const cells = grid([
-      'XXX',
-      '.X.',
-      '.X.',
-    ]);
+    const cells = grid(['XXX', '.X.', '.X.']);
     const [path] = trace(cells);
     expect(path).toHaveLength(8);
     expect(signedAreaDoubled(path)).toBeGreaterThan(0);
   });
 
   it('two separate single-cell holes yield 1 outer + 2 inner paths', () => {
-    const cells = grid([
-      'XXXXX',
-      'X.X.X',
-      'XXXXX',
-    ]);
+    const cells = grid(['XXXXX', 'X.X.X', 'XXXXX']);
     const paths = trace(cells);
     expect(paths).toHaveLength(3);
     const [outer, innerA, innerB] = paths;
@@ -694,12 +643,7 @@ describe('trace — Stage 8 fallback', () => {
   });
 
   it('non-rectangular (L-shaped) hole yields 1 outer + 1 inner', () => {
-    const cells = grid([
-      'XXXX',
-      'X..X',
-      'X.XX',
-      'XXXX',
-    ]);
+    const cells = grid(['XXXX', 'X..X', 'X.XX', 'XXXX']);
     const paths = trace(cells);
     expect(paths).toHaveLength(2);
     const [outer, inner] = paths;
@@ -713,10 +657,7 @@ describe('trace — Stage 8 fallback', () => {
     // cells at (0,0), (1,1), (1,2): (0,0) and (1,1) touch at a `\`
     // saddle; (1,1) and (1,2) share a full edge. Single 8-connected
     // component with one saddle diagonal to absorb.
-    const cells = grid([
-      'X..',
-      '.XX',
-    ]);
+    const cells = grid(['X..', '.XX']);
     const paths = trace(cells, { diagonals: true });
     expect(paths).toHaveLength(1);
     expect(paths[0]).toEqual([
@@ -743,10 +684,7 @@ describe('trace — Stage 8 fallback', () => {
     // row 1 col 2 — shared corner (2,1). NW cell=(0,1) row 0 col 1 ✓,
     // SE cell=(1,2) row 1 col 2 ✓, so yes also a `\` saddle. Two saddles.
     // Skip this — too many branches for one test.
-    const cells = grid([
-      '.X',
-      'X.',
-    ]);
+    const cells = grid(['.X', 'X.']);
     const paths = trace(cells, { diagonals: true });
     // Stage 3 matches this as a 2-vertex `/` D-line; that's the public
     // behavior users get. Stage 8 is only exercised when no detector
@@ -758,7 +696,14 @@ describe('trace — Stage 8 fallback', () => {
     const cells = grid(['X']);
     // Stage 3 requires size ≥ 2, so single cells fall to Stage 8
     const paths = trace(cells);
-    expect(paths).toEqual([[[0, 0], [1, 0], [1, 1], [0, 1]]]);
+    expect(paths).toEqual([
+      [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+      ],
+    ]);
   });
 });
 
@@ -796,11 +741,7 @@ describe('saddle invariants', () => {
     // The canonical 3×3 X: cells at the four corners plus the centre.
     // The centre cell's four corners are each a 2-present / 2-absent
     // diagonal configuration. Two `\` and two `/`.
-    const cells = grid([
-      'X.X',
-      '.X.',
-      'X.X',
-    ]);
+    const cells = grid(['X.X', '.X.', 'X.X']);
     const saddles = findSaddles(cells);
     expect(saddles.size).toBe(4);
     // Exact positions: centre cell (1,1) occupies (1,1) → (2,2), so
@@ -816,11 +757,7 @@ describe('saddle invariants', () => {
     // at-centre shape directly, even though `findSaddles` finds 4
     // saddles in the cell set. The saddle code in Stage 8 is never
     // invoked for the canonical X.
-    const cells = grid([
-      'X.X',
-      '.X.',
-      'X.X',
-    ]);
+    const cells = grid(['X.X', '.X.', 'X.X']);
     const [path] = trace(cells, { diagonals: true });
     expect(path).toHaveLength(8);
   });
@@ -843,12 +780,7 @@ describe('saddle invariants', () => {
     // Every step along the diagonal sides has 3 of 4 surrounding
     // cells present and 1 absent — a concave stair-step, not a
     // 2+2 diagonal saddle. Scales the same way for taller pyramids.
-    const pyramid = grid([
-      '...X...',
-      '..XXX..',
-      '.XXXXX.',
-      'XXXXXXX',
-    ]);
+    const pyramid = grid(['...X...', '..XXX..', '.XXXXX.', 'XXXXXXX']);
     expect(findSaddles(pyramid).size).toBe(0);
   });
 
@@ -873,27 +805,13 @@ describe('saddle invariants', () => {
   it('a 4-cell T has no saddles in any of its four orientations', () => {
     const orientations = [
       // stem-down T (bar on top)
-      grid([
-        'XXX',
-        '.X.',
-      ]),
+      grid(['XXX', '.X.']),
       // stem-up T (bar on bottom, inverted T)
-      grid([
-        '.X.',
-        'XXX',
-      ]),
+      grid(['.X.', 'XXX']),
       // stem-right (bar on left)
-      grid([
-        'X.',
-        'XX',
-        'X.',
-      ]),
+      grid(['X.', 'XX', 'X.']),
       // stem-left (bar on right)
-      grid([
-        '.X',
-        'XX',
-        '.X',
-      ]),
+      grid(['.X', 'XX', '.X']),
     ];
     for (const cells of orientations) {
       expect(findSaddles(cells).size).toBe(0);
@@ -904,18 +822,10 @@ describe('saddle invariants', () => {
   // four stem-meets-cap corners exercised simultaneously.
   it('a 7-cell I-beam has no saddles in either orientation', () => {
     // Horizontal I-beam
-    const horizontal = grid([
-      'XXX',
-      '.X.',
-      'XXX',
-    ]);
+    const horizontal = grid(['XXX', '.X.', 'XXX']);
     expect(findSaddles(horizontal).size).toBe(0);
     // Vertical I-beam (rotated 90°)
-    const vertical = grid([
-      'X.X',
-      'XXX',
-      'X.X',
-    ]);
+    const vertical = grid(['X.X', 'XXX', 'X.X']);
     expect(findSaddles(vertical).size).toBe(0);
   });
 });

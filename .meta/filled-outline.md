@@ -34,20 +34,20 @@ tested against trivial fixtures before touching QR codes at all.
 
 ## Stages
 
-| #  | Stage                                                         | Status |
-| -- | ------------------------------------------------------------- | ------ |
-| 0  | Plan & checkpoint (this document)                             | ✅     |
-| 1  | Types + ASCII-grid test fixture helper                        | ✅     |
-| 2  | Clockwise neighbour lookup                                    | ✅     |
-| 3  | Trace a straight line (H / V / D)                             | ✅     |
-| 4  | Trace a triangle                                              | ✅     |
-| 5  | Trace a square                                                | ✅     |
-| 6  | Saddles — X pattern as single 8-vertex self-intersecting loop | ✅     |
-| 7  | Hollows — rectangular O-ring with outer CW + inner CCW loops  | ✅     |
-| 8  | Unified `trace()` — fallback with saddle-diagonal handling    | ✅     |
-| 9  | Renderer (per-edge offset + sharp / rounded corners)          | ✅     |
-| 10 | Wire new pipeline into `toSvgOutline`, scan tests green       | ✅     |
-| 11 | Delete `regions.ts`, `treatments.ts`, `bad2.svg`              | ✅     |
+| #   | Stage                                                         | Status |
+| --- | ------------------------------------------------------------- | ------ |
+| 0   | Plan & checkpoint (this document)                             | ✅     |
+| 1   | Types + ASCII-grid test fixture helper                        | ✅     |
+| 2   | Clockwise neighbour lookup                                    | ✅     |
+| 3   | Trace a straight line (H / V / D)                             | ✅     |
+| 4   | Trace a triangle                                              | ✅     |
+| 5   | Trace a square                                                | ✅     |
+| 6   | Saddles — X pattern as single 8-vertex self-intersecting loop | ✅     |
+| 7   | Hollows — rectangular O-ring with outer CW + inner CCW loops  | ✅     |
+| 8   | Unified `trace()` — fallback with saddle-diagonal handling    | ✅     |
+| 9   | Renderer (per-edge offset + sharp / rounded corners)          | ✅     |
+| 10  | Wire new pipeline into `toSvgOutline`, scan tests green       | ✅     |
+| 11  | Delete `regions.ts`, `treatments.ts`, `bad2.svg`              | ✅     |
 
 ## Data model
 
@@ -59,7 +59,10 @@ type CellSet = ReadonlySet<CellKey>;
 type Vertex = readonly [x: number, y: number];
 type Path = readonly Vertex[]; // closed, clockwise, >= 2 vertices
 
-function trace(cells: CellSet, options?: { diagonals?: boolean }): readonly Path[];
+function trace(
+  cells: CellSet,
+  options?: { diagonals?: boolean },
+): readonly Path[];
 ```
 
 ## Confirmed decisions
@@ -93,7 +96,7 @@ cell-collapse) were considered and rejected.
 
 Outer CW + inner CCW. Rationale: the filled material stays on the
 right-hand side of every edge in both loops, so the Stage 9 renderer
-(which offsets each edge outward along its *left-hand* perpendicular)
+(which offsets each edge outward along its _left-hand_ perpendicular)
 expands the outer boundary outward AND contracts the hole inward. The
 evenodd alternative requires the renderer to know about loop nesting;
 opposite-winding is self-contained per edge.
@@ -193,6 +196,7 @@ cell-border outline.
 **Render-layer split: `offset` vs `lineThickness`.** A single signed
 offset couldn't serve both geometries — regions at `0.5` would be
 oversized, lines at `0` would be invisible. Split into two options:
+
 - `offset` — signed perpendicular distance for region paths. `0`
   renders cells exactly.
 - `lineThickness` — full width of line-like paths. Applied to
@@ -237,6 +241,7 @@ option-translation parity (`color.dark/light`, `errorCorrectionLevel`).
 Doubles as a regression guard against future node-qrcode updates.
 
 **Publish-ready structure.** Six dual-format (ESM + CJS) entry points:
+
 - `@verevoir/qr` — universal core.
 - `@verevoir/qr/node` — `toFile`, `toBuffer`.
 - `@verevoir/qr/web` — `svgToPng`, `downloadPng`, DOM helpers.
@@ -245,10 +250,10 @@ Doubles as a regression guard against future node-qrcode updates.
 - `@verevoir/qr/qrcode/web` — shim + canvas bits.
 
 **Final tally: 219 tests across 7 files, all green.**
+
 - trace 63 (including 10 saddle invariant tests)
 - render 11
 - scan 63
 - qrcode-parity 26
 - svg 36
 - encode / png suites unchanged
-

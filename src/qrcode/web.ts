@@ -29,7 +29,6 @@ export interface ToCanvasOptions extends QRCodeOptions {
   size?: number;
 }
 
-/* eslint-disable no-redeclare */
 export function toCanvas(
   canvas: HTMLCanvasElement,
   text: string,
@@ -56,11 +55,13 @@ export function toCanvas(
   a?: ToCanvasOptions | Callback<HTMLCanvasElement>,
   b?: Callback<HTMLCanvasElement>,
 ): Promise<HTMLCanvasElement> | void {
-  const { options, cb } = normaliseArgs<ToCanvasOptions, HTMLCanvasElement>(a, b);
+  const { options, cb } = normaliseArgs<ToCanvasOptions, HTMLCanvasElement>(
+    a,
+    b,
+  );
   const promise = drawCanvas(canvas, text, options);
   return handle(promise, cb);
 }
-/* eslint-enable no-redeclare */
 
 async function drawCanvas(
   canvas: HTMLCanvasElement,
@@ -96,7 +97,6 @@ async function drawCanvas(
 // toDataURL
 // ---------------------------------------------------------------------------
 
-/* eslint-disable no-redeclare */
 export function toDataURL(text: string): Promise<string>;
 export function toDataURL(
   text: string,
@@ -117,7 +117,6 @@ export function toDataURL(
   const promise = dataUrlFromOptions(text, options);
   return handle(promise, cb);
 }
-/* eslint-enable no-redeclare */
 
 async function dataUrlFromOptions(
   text: string,
@@ -151,7 +150,8 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('blobToDataUrl: FileReader failed'));
+    reader.onerror = () =>
+      reject(new Error('blobToDataUrl: FileReader failed'));
     reader.readAsDataURL(blob);
   });
 }

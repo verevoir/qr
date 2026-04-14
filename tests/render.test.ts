@@ -42,9 +42,7 @@ describe('render', () => {
       [2, 2],
       [1, 2],
     ];
-    expect(render([square], { offset: 0 })).toBe(
-      'M1,1L2,1L2,2L1,2Z',
-    );
+    expect(render([square], { offset: 0 })).toBe('M1,1L2,1L2,2L1,2Z');
   });
 
   it('degenerate 2-vertex horizontal line becomes a flat-capped capsule', () => {
@@ -88,9 +86,9 @@ describe('render', () => {
       [1, 1],
       [0, 1],
     ];
-    expect(
-      render([square], { offset: 0, translate: [1, 1] }),
-    ).toBe('M1,1L2,1L2,2L1,2Z');
+    expect(render([square], { offset: 0, translate: [1, 1] })).toBe(
+      'M1,1L2,1L2,2L1,2Z',
+    );
   });
 
   it('multiple paths concatenate as multiple subpaths', () => {

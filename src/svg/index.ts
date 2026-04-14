@@ -15,7 +15,13 @@ import { renderDiagonal } from './diagonal.js';
 import { renderGrid } from './grid.js';
 import { renderTubemap, renderMetro } from './tubemap.js';
 import { renderScribble, renderMetroScribble } from './scribble.js';
-import { toSvgOutline, SHARP, ROUNDED, SHARP_DIAGONAL, ROUNDED_DIAGONAL } from './outline.js';
+import {
+  toSvgOutline,
+  SHARP,
+  ROUNDED,
+  SHARP_DIAGONAL,
+  ROUNDED_DIAGONAL,
+} from './outline.js';
 
 export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
   const style: SvgStyle = options?.style ?? 'square';
@@ -24,10 +30,18 @@ export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
   const color = options?.color;
 
   // Outline pipeline produces its own complete SVG with named groups.
-  if (style === 'outline') return toSvgOutline(qr, { cornerStyle, treatment: SHARP, color });
-  if (style === 'outline-round') return toSvgOutline(qr, { cornerStyle, treatment: ROUNDED, color });
-  if (style === 'outline-diagonal') return toSvgOutline(qr, { cornerStyle, treatment: SHARP_DIAGONAL, color });
-  if (style === 'outline-round-diagonal') return toSvgOutline(qr, { cornerStyle, treatment: ROUNDED_DIAGONAL, color });
+  if (style === 'outline')
+    return toSvgOutline(qr, { cornerStyle, treatment: SHARP, color });
+  if (style === 'outline-round')
+    return toSvgOutline(qr, { cornerStyle, treatment: ROUNDED, color });
+  if (style === 'outline-diagonal')
+    return toSvgOutline(qr, { cornerStyle, treatment: SHARP_DIAGONAL, color });
+  if (style === 'outline-round-diagonal')
+    return toSvgOutline(qr, {
+      cornerStyle,
+      treatment: ROUNDED_DIAGONAL,
+      color,
+    });
 
   // Corner patterns (finder + alignment)
   let content = renderCorners(qr, cornerStyle);

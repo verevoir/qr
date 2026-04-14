@@ -23,7 +23,7 @@ the public API.
   cutters can treat each as its own cut. Three groups:
   `<g id="finder">`, `<g id="dark">`, `<g id="light">`.
 - **Trace + render decomposition.** A style is a combination of
-  *which cells go in* and *which render options apply*, not an
+  _which cells go in_ and _which render options apply_, not an
   ad-hoc renderer. Shared mechanics (offsetting, corner treatment,
   capsule caps) live once in `render`.
 - **Curated public surface.** The possibility space below is wide;
@@ -84,7 +84,7 @@ corners + shrink-inward offset do most of the work.
 - **stars / flowers** — exotic per-cell primitives if render grows
   a "replace each unit path with a template" hook. Not a priority.
 
-Light-cell variants (trace the *empty* cells) produce the negative
+Light-cell variants (trace the _empty_ cells) produce the negative
 of any of the above. Useful for layered designs where the light
 layer is its own colour.
 
@@ -150,8 +150,8 @@ spiral path.
 ## Public shortlist (to be curated)
 
 Deliberately empty. When the library packages as v2, pick from the
-above. Guiding question for each candidate: *what designer problem
-does this style solve that none of the others do?* If two
+above. Guiding question for each candidate: _what designer problem
+does this style solve that none of the others do?_ If two
 candidates answer the same question, ship one.
 
 Rough priors, not decisions:
