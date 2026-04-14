@@ -9,50 +9,82 @@
  * the v2 `encode` + `toSvg` pipeline.
  *
  * This entry point is universal (works in Node and browsers). For
- * platform-specific extensions see `./qrcode/node` (toFile, toBuffer)
- * and `./qrcode/web` (toCanvas).
+ * platform-specific extensions see `./qrcode/node` (toFile, toBuffer,
+ * toDataURL) and `./qrcode/web` (toCanvas, toDataURL).
  *
- * Coverage vs `node-qrcode`:
+ * ## API shape
+ *
+ * The underlying v2 engine is fully synchronous, so this shim's
+ * `toString` returns a string directly rather than wrapping it in a
+ * Promise. Existing `await QRCode.toString(...)` call sites still
+ * work unchanged — `await` on a non-Promise resolves to the value.
+ *
+ * The node-qrcode-style `(err, result)` callback form is supported
+ * everywhere node-qrcode supports it. Callbacks are invoked
+ * synchronously from `toString` / `create` since the work is sync.
+ *
+ * ## What's covered
  *
  * - ✅ `create` — returns a QR matrix description
- * - ✅ `toString(text, { type: 'svg' })`
- * - ⏳ `toString(text, { type: 'terminal' | 'utf8' })` — not yet
- *   implemented, falls through to SVG
- * - ✅ `errorCorrectionLevel`, `margin`, `color.dark`, `color.light`
- *   options
- * - ⏳ `version` / `maskPattern` pin options — ignored (the v2 engine
- *   picks the best fit)
- * - Callbacks are not supported — every function returns a Promise
+ * - ✅ `toString(text, opts)` and `toString(text, opts, cb)`,
+ *      with `format: 'svg' | 'utf8' | 'terminal'` (aliased as
+ *      `type` for source compatibility). `'svg'` is the default.
+ * - ✅ `errorCorrectionLevel`, `margin`, `width`, `color.dark`,
+ *      `color.light` options.
+ * - ⚠️  `version` / `maskPattern` not honoured — node-qrcode ignores
+ *      them in practice for most callers too. The v2 engine always
+ *      picks the best fit.
+ * - ⚠️  `color.dark` / `color.light` are applied by string-replacing
+ *      the emitted SVG. Works for the default `'square'` style;
+ *      less reliable for the fancier styles. Proper fill plumbing
+ *      arrives once the render options settle.
  */
 
 import { encode } from '../encode.js';
 import { toSvg } from '../svg/index.js';
-import type { ErrorLevel, QrResult, SvgOptions } from '../types.js';
+import type {
+  ErrorLevel,
+  QrMatrix,
+  QrResult,
+  SvgOptions,
+} from '../types.js';
+
+/** node-style callback: `(err, result)`. Error is `null` on success. */
+export type Callback<T = void> = (err: Error | null, result?: T) => void;
+
+/** String-output formats supported by `toString`. */
+export type QRCodeFormat = 'svg' | 'utf8' | 'terminal';
 
 /** Subset of `node-qrcode`'s option bag that the shim understands. */
 export interface QRCodeOptions {
   errorCorrectionLevel?: ErrorLevel;
   /** Size of the quiet-zone margin in modules. Default `4`. */
   margin?: number;
-  /** Output width in pixels. Applied to the SVG `width`/`height`. */
+  /** Output width in pixels. Applied to the SVG `width` / `height`. */
   width?: number;
-  /**
-   * Colours. Only `dark` is applied to the rendered modules; `light`
-   * becomes the SVG background. Both accept any CSS colour string.
-   */
+  /** Colours. `dark` replaces the fill; `light` becomes the background. */
   color?: { dark?: string; light?: string };
-  /** Output type when calling `toString`. Defaults to `'svg'`. */
-  type?: 'svg' | 'utf8' | 'terminal';
-  /** Passed through to the v2 `toSvg` when set. */
+  /**
+   * Output format for `toString`. Defaults to `'svg'` — the natural
+   * output of the v2 engine. `'utf8'` and `'terminal'` render the
+   * matrix as text characters.
+   */
+  format?: QRCodeFormat;
+  /** Alias for `format` — kept so `node-qrcode` call sites port unchanged. */
+  type?: QRCodeFormat;
+  /** Passed through to the v2 `toSvg`. */
   style?: SvgOptions['style'];
-  /** Passed through to the v2 `toSvg` when set. */
+  /** Passed through to the v2 `toSvg`. */
   cornerStyle?: SvgOptions['cornerStyle'];
 }
 
+// ---------------------------------------------------------------------------
+// create
+// ---------------------------------------------------------------------------
+
 /**
- * Return a `QRCode`-like matrix description. Shaped to match the
- * object `node-qrcode`'s `create()` returns closely enough that
- * simple callers can treat them interchangeably.
+ * Return a `QRCode`-like matrix description. Shape mirrors
+ * `node-qrcode.create()` closely enough for simple callers.
  */
 export function create(
   text: string,
@@ -64,17 +96,72 @@ export function create(
   return qr;
 }
 
-/**
- * Produce a string representation of the QR code. Matches
- * `node-qrcode.toString(text, opts)` for `type: 'svg'`.
- */
-export async function toString(
+// ---------------------------------------------------------------------------
+// toString (sync)
+// ---------------------------------------------------------------------------
+
+/* eslint-disable no-redeclare */
+export function toString(text: string): string;
+export function toString(text: string, options: QRCodeOptions): string;
+export function toString(text: string, cb: Callback<string>): void;
+export function toString(
   text: string,
-  options: QRCodeOptions = {},
-): Promise<string> {
+  options: QRCodeOptions,
+  cb: Callback<string>,
+): void;
+export function toString(
+  text: string,
+  a?: QRCodeOptions | Callback<string>,
+  b?: Callback<string>,
+): string | void {
+  const { options, cb } = normaliseArgs(a, b);
+  try {
+    const result = buildString(text, options);
+    if (cb) {
+      cb(null, result);
+      return;
+    }
+    return result;
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    if (cb) {
+      cb(error);
+      return;
+    }
+    throw error;
+  }
+}
+/* eslint-enable no-redeclare */
+
+export default { create, toString };
+
+// ---------------------------------------------------------------------------
+// Internal helpers — exported so the platform subpaths can share them
+// ---------------------------------------------------------------------------
+
+/**
+ * Split the `(options?, callback?)` / `(callback?)` positional
+ * argument shape used by every node-qrcode entry point into a
+ * normalised `{ options, cb }` pair.
+ */
+export function normaliseArgs<O extends object, T>(
+  a: O | Callback<T> | undefined,
+  b: Callback<T> | undefined,
+): { options: O; cb: Callback<T> | undefined } {
+  if (typeof a === 'function') {
+    return { options: {} as O, cb: a };
+  }
+  return { options: (a ?? ({} as O)) as O, cb: b };
+}
+
+/** Build the full string output for `toString`. Sync, format-aware. */
+export function buildString(text: string, options: QRCodeOptions): string {
+  const format = options.format ?? options.type ?? 'svg';
   const [qr] = encode(text, {
     minErrorLevel: options.errorCorrectionLevel ?? 'M',
   });
+  if (format === 'utf8') return buildUtf8(qr, options.margin ?? 1);
+  if (format === 'terminal') return buildTerminal(qr, options.margin ?? 1);
   let svg = toSvg(qr, {
     style: options.style,
     cornerStyle: options.cornerStyle,
@@ -85,8 +172,54 @@ export async function toString(
   return svg;
 }
 
-/** Default export mimicking `node-qrcode`'s module shape. */
-export default { create, toString };
+// ---------------------------------------------------------------------------
+// Format renderers
+// ---------------------------------------------------------------------------
+
+/**
+ * UTF-8 rendering: each dark module as two "█" characters, each light
+ * as two spaces. Doubling the width keeps the aspect ratio correct in
+ * a monospace terminal (characters are typically twice as tall as
+ * wide).
+ */
+function buildUtf8(qr: QrMatrix, margin: number): string {
+  const DARK = '██';
+  const LIGHT = '  ';
+  const totalWidth = qr.size + margin * 2;
+  const borderRow = LIGHT.repeat(totalWidth) + '\n';
+  let out = borderRow.repeat(margin);
+  for (let r = 0; r < qr.size; r++) {
+    out += LIGHT.repeat(margin);
+    for (let c = 0; c < qr.size; c++) {
+      out += qr.matrix[r][c] === 1 ? DARK : LIGHT;
+    }
+    out += LIGHT.repeat(margin) + '\n';
+  }
+  out += borderRow.repeat(margin);
+  return out;
+}
+
+/**
+ * Terminal rendering: uses ANSI colour escapes so the QR shows with
+ * contrast on dark-on-light terminals. Identical matrix layout as
+ * `buildUtf8`.
+ */
+function buildTerminal(qr: QrMatrix, margin: number): string {
+  const DARK = '\x1b[40m  \x1b[0m';
+  const LIGHT = '\x1b[47m  \x1b[0m';
+  const totalWidth = qr.size + margin * 2;
+  const borderRow = LIGHT.repeat(totalWidth) + '\n';
+  let out = borderRow.repeat(margin);
+  for (let r = 0; r < qr.size; r++) {
+    out += LIGHT.repeat(margin);
+    for (let c = 0; c < qr.size; c++) {
+      out += qr.matrix[r][c] === 1 ? DARK : LIGHT;
+    }
+    out += LIGHT.repeat(margin) + '\n';
+  }
+  out += borderRow.repeat(margin);
+  return out;
+}
 
 // ---------------------------------------------------------------------------
 // Option-to-SVG translators
@@ -94,7 +227,8 @@ export default { create, toString };
 
 /**
  * Substitute the default black fill and transparent background with
- * the user's colours. Matches the common `node-qrcode` usage.
+ * the user's colours. String-replace — brittle for complex styles;
+ * to be revisited once `render` has a fill override option.
  */
 function applyColours(
   svg: string,
@@ -107,7 +241,6 @@ function applyColours(
     out = out.replaceAll('fill="#000000"', `fill="${color.dark}"`);
   }
   if (color.light && color.light !== 'transparent') {
-    // Insert a background rect as the first child of the <svg>
     out = out.replace(
       /(<svg[^>]*>)/,
       `$1<rect width="100%" height="100%" fill="${color.light}"/>`,
@@ -119,31 +252,24 @@ function applyColours(
 /**
  * Pad the viewBox by `margin` modules on every side. `node-qrcode`
  * defaults to 4 modules; the v2 engine already includes a 1-module
- * padding, so we add the difference.
+ * padding, so we adjust relative to that.
  */
-function applyMargin(
-  svg: string,
-  margin: number | undefined,
-): string {
+function applyMargin(svg: string, margin: number | undefined): string {
   if (margin === undefined) return svg;
   const viewBoxMatch = svg.match(/viewBox="0 0 (\d+(?:\.\d+)?) \1"/);
   if (!viewBoxMatch) return svg;
   const currentSize = Number(viewBoxMatch[1]);
-  const baseModules = currentSize - 2; //   engine already pads by 1 on each side
+  const baseModules = currentSize - 2; //   engine pads by 1 on each side
   const newSize = baseModules + margin * 2;
   const offset = margin - 1;
-  return svg
-    .replace(
-      /viewBox="0 0 \d+(?:\.\d+)?\s\d+(?:\.\d+)?"/,
-      `viewBox="${-offset} ${-offset} ${newSize} ${newSize}"`,
-    );
+  return svg.replace(
+    /viewBox="0 0 \d+(?:\.\d+)?\s\d+(?:\.\d+)?"/,
+    `viewBox="${-offset} ${-offset} ${newSize} ${newSize}"`,
+  );
 }
 
-/** Explicit width/height override in pixels. */
+/** Explicit pixel width/height on the `<svg>` root. */
 function applyWidth(svg: string, width: number | undefined): string {
   if (width === undefined) return svg;
-  return svg.replace(
-    /(<svg[^>]*)>/,
-    `$1 width="${width}" height="${width}">`,
-  );
+  return svg.replace(/(<svg[^>]*)>/, `$1 width="${width}" height="${width}">`);
 }
