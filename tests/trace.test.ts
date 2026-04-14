@@ -34,16 +34,16 @@ function grid(rows: readonly string[]): CellSet {
 // ---------------------------------------------------------------------------
 
 describe('clockwiseNeighbours', () => {
-  it('offset tables are clockwise from NE (8) and E (4)', () => {
+  it('8-connected order: diagonals first (CW from NE), then cardinals (CW from E)', () => {
     expect(CLOCKWISE_8).toEqual([
-      [-1, 1],
-      [0, 1],
-      [1, 1],
-      [1, 0],
-      [1, -1],
-      [0, -1],
-      [-1, -1],
-      [-1, 0],
+      [-1, 1], //  NE
+      [1, 1], //   SE
+      [1, -1], //  SW
+      [-1, -1], // NW
+      [0, 1], //   E
+      [1, 0], //   S
+      [0, -1], //  W
+      [-1, 0], //  N
     ]);
     expect(CLOCKWISE_4).toEqual([
       [0, 1],
@@ -78,16 +78,16 @@ describe('clockwiseNeighbours', () => {
     expect(clockwiseNeighbours([1, 1], cells)).toEqual([]);
   });
 
-  it('8-connected: full ring visits NE, E, SE, S, SW, W, NW, N in order', () => {
+  it('8-connected: full ring visits diagonals (NE, SE, SW, NW) then cardinals (E, S, W, N)', () => {
     const cells = grid(['XXX', 'XXX', 'XXX']);
     expect(clockwiseNeighbours([1, 1], cells, { diagonals: true })).toEqual([
       [0, 2], // NE
-      [1, 2], // E
       [2, 2], // SE
-      [2, 1], // S
       [2, 0], // SW
-      [1, 0], // W
       [0, 0], // NW
+      [1, 2], // E
+      [2, 1], // S
+      [1, 0], // W
       [0, 1], // N
     ]);
   });
@@ -103,11 +103,12 @@ describe('clockwiseNeighbours', () => {
   });
 
   it('handles edge cells with out-of-bounds neighbours', () => {
-    // Corner cell at (0,0) — N, W, NW, NE, SW are all out of bounds
+    // Corner cell at (0,0) — N, W, NW, NE, SW are all out of bounds.
+    // Present neighbours are SE (diagonal, now first), then E and S (cardinals).
     const cells = grid(['XX', 'XX']);
     expect(clockwiseNeighbours([0, 0], cells, { diagonals: true })).toEqual([
-      [0, 1], // E
       [1, 1], // SE
+      [0, 1], // E
       [1, 0], // S
     ]);
   });

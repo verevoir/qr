@@ -103,18 +103,23 @@ export interface TraceOptions {
 // ---------------------------------------------------------------------------
 
 /**
- * 8-connected neighbour offsets as `[dRow, dCol]`, ordered clockwise from
- * NE — the first direction you look when scanning in reading order.
+ * 8-connected neighbour offsets as `[dRow, dCol]`. Diagonals first
+ * (clockwise from NE), then cardinals (clockwise from E). This
+ * ordering biases detection and traversal toward diagonal
+ * relationships before rectilinear ones — important for shapes
+ * like stepped stripes where the diagonal structure is the
+ * defining feature and would otherwise get classified as a
+ * stair-stepped rectilinear shape.
  */
 export const CLOCKWISE_8: readonly Cell[] = [
-  [-1, 1], // NE
-  [0, 1], //  E
-  [1, 1], //  SE
-  [1, 0], //  S
-  [1, -1], // SW
-  [0, -1], // W
+  [-1, 1], //  NE
+  [1, 1], //   SE
+  [1, -1], //  SW
   [-1, -1], // NW
-  [-1, 0], // N
+  [0, 1], //   E
+  [1, 0], //   S
+  [0, -1], //  W
+  [-1, 0], //  N
 ];
 
 /** 4-connected neighbour offsets, clockwise from E. */
