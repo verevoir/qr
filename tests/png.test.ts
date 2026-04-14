@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { svgToPng, downloadPng } from '../src/index.js';
-import type { PngOptions } from '../src/index.js';
+import { svgToPng, downloadPng } from '../src/web.js';
+import type { PngOptions } from '../src/web.js';
 
 describe('svgToPng', () => {
   it('is exported as a function', () => {

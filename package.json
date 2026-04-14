@@ -1,7 +1,7 @@
 {
   "name": "@verevoir/qr",
-  "version": "1.1.0",
-  "description": "QR code encoding engine and SVG renderers — multiple visual styles with zero dependencies",
+  "version": "2.0.0",
+  "description": "QR code encoding engine and SVG renderers — multiple visual styles, layered output, fabrication-ready, zero runtime dependencies",
   "homepage": "https://verevoir.io",
   "license": "MIT",
   "type": "module",
@@ -13,6 +13,39 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js",
+      "require": "./dist/node.cjs"
+    },
+    "./web": {
+      "types": "./dist/web.d.ts",
+      "import": "./dist/web.js",
+      "require": "./dist/web.cjs"
+    },
+    "./qrcode": {
+      "types": "./dist/qrcode/index.d.ts",
+      "import": "./dist/qrcode/index.js",
+      "require": "./dist/qrcode/index.cjs"
+    },
+    "./qrcode/node": {
+      "types": "./dist/qrcode/node.d.ts",
+      "import": "./dist/qrcode/node.js",
+      "require": "./dist/qrcode/node.cjs"
+    },
+    "./qrcode/web": {
+      "types": "./dist/qrcode/web.d.ts",
+      "import": "./dist/qrcode/web.js",
+      "require": "./dist/qrcode/web.cjs"
+    }
+  },
+  "peerDependencies": {
+    "@resvg/resvg-js": "^2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@resvg/resvg-js": {
+      "optional": true
     }
   },
   "files": [
@@ -33,6 +66,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@resvg/resvg-js": "^2.6.2",
+    "@types/node": "^25.6.0",
     "eslint": "^10.2.0",
     "eslint-config-prettier": "^10.1.8",
     "jsqr": "^1.4.0",
