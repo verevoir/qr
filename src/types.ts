@@ -10,7 +10,11 @@ export type SvgStyle =
   | 'lines'
   | 'metro'
   | 'scribble'
-  | 'scribble-alt';
+  | 'scribble-alt'
+  | 'outline'
+  | 'outline-round'
+  | 'outline-diagonal'
+  | 'outline-round-diagonal';
 
 export type CornerStyle = 'square' | 'rounded' | 'round';
 
@@ -39,6 +43,18 @@ export interface QrResult extends QrMatrix {
 }
 
 export interface EncodeOptions {
+  /**
+   * Minimum error correction level. The encoder tries the highest level that
+   * fits (H→Q→M→L) at the minimum required version, so the actual level may
+   * be higher than specified. Default: `'L'`.
+   */
   minErrorLevel?: ErrorLevel;
+  /**
+   * When `true`, guarantees H-level error correction even if it requires a
+   * larger QR version than the data alone would need. Useful for stylised
+   * renderings (dots, scribble, etc.) where scanning conditions are harder.
+   * Equivalent to `minErrorLevel: 'H'`.
+   */
+  boostErrorCorrection?: boolean;
   threshold?: number;
 }

@@ -15,17 +15,23 @@ import { renderDiagonal } from './diagonal.js';
 import { renderGrid } from './grid.js';
 import { renderTubemap, renderMetro } from './tubemap.js';
 import { renderScribble, renderMetroScribble } from './scribble.js';
+import { toSvgOutline, SHARP, ROUNDED, SHARP_DIAGONAL, ROUNDED_DIAGONAL } from './outline.js';
 
 export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
   const style: SvgStyle = options?.style ?? 'square';
   const cornerStyle: CornerStyle = options?.cornerStyle ?? 'rounded';
   const lineWidth: LineWidth = options?.lineWidth ?? 'normal';
-  let content = '';
+
+  // Outline pipeline produces its own complete SVG with named groups.
+  if (style === 'outline') return toSvgOutline(qr, { cornerStyle, treatment: SHARP });
+  if (style === 'outline-round') return toSvgOutline(qr, { cornerStyle, treatment: ROUNDED });
+  if (style === 'outline-diagonal') return toSvgOutline(qr, { cornerStyle, treatment: SHARP_DIAGONAL });
+  if (style === 'outline-round-diagonal') return toSvgOutline(qr, { cornerStyle, treatment: ROUNDED_DIAGONAL });
 
   // Corner patterns (finder + alignment)
-  content += renderCorners(qr, cornerStyle);
+  let content = renderCorners(qr, cornerStyle);
 
-  // Data modules in the chosen style
+  // Data modules in the chosen style.
   // Timing patterns are included in the data matrix and rendered in-style.
   switch (style) {
     case 'dots':

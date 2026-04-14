@@ -32,8 +32,10 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@resvg/resvg-js": "^2.6.2",
     "eslint": "^10.2.0",
     "eslint-config-prettier": "^10.1.8",
+    "jsqr": "^1.4.0",
     "prettier": "^3.8.2",
     "tsup": "^8.5.1",
     "typescript": "^6.0.2",
