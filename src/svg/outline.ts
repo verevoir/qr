@@ -132,18 +132,21 @@ export function toSvgOutline(
   // Components that don't match a detector fall through to the
   // Stage 8 unified tracer for a faithful cell-border outline.
   const cells = buildDataCellSet(qr);
-  // `saddleNotch: 0.125` only matters for components that fall
-  // through to Stage 8 (larger irregular shapes that don't match
-  // the Stage 3-7 creative detectors). Notch=0 would use the
-  // full-diagonal saddle replacement, which has an adjacent-saddle
-  // edge-overlap bug on dense QR patterns. The chamfered approach
-  // produces safe, scannable outlines for the fallback geometry.
-  // Small components (L triangles, X pinwheels, capsule lines) use
-  // the creative detectors unchanged, so their clean 3- / 8- / 2-
-  // vertex outputs are preserved.
+  // `saddleNotch: 0.5` makes saddle chamfers genuinely visible at
+  // render sizes designers actually use. Smaller notches (tried
+  // 0.125) produce mathematically correct diagonals but end up at
+  // ~1 pixel of bevel on a 200px QR — invisible in practice. At
+  // 0.5 each filled cell has its saddle-corner triangle trimmed,
+  // and cells surrounded by saddles (e.g. the centre of an X)
+  // render as inscribed diamonds. The scan sweep confirmed every
+  // URL length decodes cleanly at every notch from 0.1 through 0.5
+  // once the adjacent-saddle trim-overflow bug was fixed. Small
+  // components (L triangles, X pinwheels, capsule lines) still use
+  // the creative detectors unchanged; the notch only affects
+  // Stage 8 fallback geometry.
   const paths = traceComponents(cells, {
     diagonals,
-    saddleNotch: diagonals ? 0.125 : 0,
+    saddleNotch: diagonals ? 0.5 : 0,
   });
   const lineThickness = 1 - 2 * (treatment.inset ?? 0);
   const pathData = render(paths, {
