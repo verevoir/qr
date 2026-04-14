@@ -47,7 +47,61 @@ export function dotWidth(lw: LineWidth): number {
   return lw === 'thin' ? 0.65 : 0.9;
 }
 
-export function wrapSvg(size: number, content: string): string {
+export interface WrapOptions {
+  /**
+   * Colour of the dark modules. Any CSS colour string. Default `#000`.
+   */
+  dark?: string;
+  /**
+   * Colour of the light modules — the inner "white" parts of finder
+   * patterns, the separator strokes of the dots style, and so on.
+   * Default `#fff`. Pass `'transparent'` to let the page background
+   * show through.
+   */
+  light?: string;
+  /**
+   * When set, emits a full-size `<rect>` filled with this colour as
+   * the first child of the `<svg>`. Distinct from `light` so you can
+   * have, say, a dark-grey page background under white light modules.
+   */
+  background?: string;
+}
+
+/**
+ * Apply the colour overrides to an already-rendered string of SVG
+ * content. The individual renderers emit `fill="#000"` / `fill="#fff"`
+ * (and the stroke equivalents) as fixed defaults; `applyColours`
+ * rewrites those to the user's values exactly once, at the wrapping
+ * boundary. Keeping the substitution contained here means no renderer
+ * needs to know about colour and consumers that don't pass `color`
+ * get byte-identical output to the pre-colour implementation.
+ */
+export function applyColours(content: string, options: WrapOptions): string {
+  let out = content;
+  const dark = options.dark;
+  const light = options.light;
+  if (dark && dark !== '#000') {
+    out = out.replaceAll('"#000"', `"${dark}"`);
+  }
+  if (light && light !== '#fff') {
+    out = out.replaceAll('"#fff"', `"${light}"`);
+  }
+  return out;
+}
+
+export function wrapSvg(
+  size: number,
+  content: string,
+  options: WrapOptions = {},
+): string {
   const viewSize = size + 2;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewSize} ${viewSize}"><g>${content}</g></svg>`;
+  const coloured = applyColours(content, options);
+  const bg = options.background
+    ? `<rect width="${viewSize}" height="${viewSize}" fill="${options.background}"/>`
+    : '';
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewSize} ${viewSize}">` +
+    `${bg}<g>${coloured}</g>` +
+    `</svg>`
+  );
 }

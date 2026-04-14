@@ -21,12 +21,13 @@ export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
   const style: SvgStyle = options?.style ?? 'square';
   const cornerStyle: CornerStyle = options?.cornerStyle ?? 'rounded';
   const lineWidth: LineWidth = options?.lineWidth ?? 'normal';
+  const color = options?.color;
 
   // Outline pipeline produces its own complete SVG with named groups.
-  if (style === 'outline') return toSvgOutline(qr, { cornerStyle, treatment: SHARP });
-  if (style === 'outline-round') return toSvgOutline(qr, { cornerStyle, treatment: ROUNDED });
-  if (style === 'outline-diagonal') return toSvgOutline(qr, { cornerStyle, treatment: SHARP_DIAGONAL });
-  if (style === 'outline-round-diagonal') return toSvgOutline(qr, { cornerStyle, treatment: ROUNDED_DIAGONAL });
+  if (style === 'outline') return toSvgOutline(qr, { cornerStyle, treatment: SHARP, color });
+  if (style === 'outline-round') return toSvgOutline(qr, { cornerStyle, treatment: ROUNDED, color });
+  if (style === 'outline-diagonal') return toSvgOutline(qr, { cornerStyle, treatment: SHARP_DIAGONAL, color });
+  if (style === 'outline-round-diagonal') return toSvgOutline(qr, { cornerStyle, treatment: ROUNDED_DIAGONAL, color });
 
   // Corner patterns (finder + alignment)
   let content = renderCorners(qr, cornerStyle);
@@ -67,5 +68,5 @@ export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
       break;
   }
 
-  return wrapSvg(qr.size, content);
+  return wrapSvg(qr.size, content, color);
 }

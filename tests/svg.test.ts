@@ -15,6 +15,51 @@ describe('toSvg', () => {
     expect(svg).toContain(`viewBox="0 0 ${qr.size + 2} ${qr.size + 2}"`);
   });
 
+  describe('color options', () => {
+    it('defaults to black dark modules', () => {
+      const qr = getQr();
+      const svg = toSvg(qr);
+      expect(svg).toContain('fill="#000"');
+    });
+
+    it('color.dark replaces the dark-module fill', () => {
+      const qr = getQr();
+      const svg = toSvg(qr, { color: { dark: '#c62828' } });
+      expect(svg).toContain('fill="#c62828"');
+      expect(svg).not.toContain('fill="#000"');
+    });
+
+    it('color.light replaces the light-module fill (finder inner rect, dots light layer)', () => {
+      const qr = getQr();
+      const svg = toSvg(qr, { color: { light: '#fafafa' } });
+      expect(svg).toContain('fill="#fafafa"');
+      expect(svg).not.toContain('fill="#fff"');
+    });
+
+    it('color.background emits a full-size background <rect>', () => {
+      const qr = getQr();
+      const svg = toSvg(qr, { color: { background: '#eeeeee' } });
+      expect(svg).toMatch(/<rect width="\d+" height="\d+" fill="#eeeeee"\/>/);
+    });
+
+    it('outline styles respect color options', () => {
+      const qr = getQr();
+      const svg = toSvg(qr, {
+        style: 'outline',
+        color: { dark: '#123456', light: '#abcdef' },
+      });
+      expect(svg).toContain('fill="#123456"');
+      expect(svg).toContain('fill="#abcdef"');
+    });
+
+    it('color options do not affect default output when unset', () => {
+      const qr = getQr();
+      const withoutColor = toSvg(qr);
+      const withEmptyColor = toSvg(qr, { color: {} });
+      expect(withoutColor).toBe(withEmptyColor);
+    });
+  });
+
   const styles: SvgStyle[] = [
     'square',
     'dots',
@@ -85,7 +130,6 @@ describe('toSvg', () => {
     it('renders both dark and light dots', () => {
       const qr = getQr();
       const svg = toSvg(qr, { style: 'dots' });
-      // Should have both black and white stroked elements
       expect(svg).toContain('stroke="#000"');
       expect(svg).toContain('stroke="#fff"');
     });

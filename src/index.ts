@@ -32,6 +32,7 @@ export type {
   CornerStyle,
   LineWidth,
   SvgOptions,
+  SvgColor,
   QrMatrix,
   QrResult,
   EncodeOptions,

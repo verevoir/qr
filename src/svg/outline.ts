@@ -1,5 +1,6 @@
-import type { QrMatrix, CornerStyle } from '../types.js';
+import type { QrMatrix, CornerStyle, SvgColor } from '../types.js';
 import { renderCorners } from './corners.js';
+import { applyColours } from './shared.js';
 import { traceComponents, cellKey } from './trace.js';
 import type { CellKey, CellSet } from './trace.js';
 import { render } from './render.js';
@@ -72,6 +73,11 @@ export interface OutlineOptions {
    * Defaults to `SHARP` (sharp corners, no inset, no diagonal).
    */
   treatment?: TreatmentOptions;
+  /**
+   * Colour controls. See `SvgColor` — applied via the root `color`
+   * attribute and `--qr-light` custom property.
+   */
+  color?: SvgColor;
 }
 
 /**
@@ -158,10 +164,18 @@ export function toSvgOutline(
     : '';
 
   const viewSize = qr.size + 2;
+  const color = options.color ?? {};
+  const coloured = applyColours(
+    `<g id="finder">${finderContent}</g><g id="data">${dataContent}</g>`,
+    color,
+  );
+  const bg = color.background
+    ? `<rect width="${viewSize}" height="${viewSize}" fill="${color.background}"/>`
+    : '';
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewSize} ${viewSize}">` +
-    `<g id="finder">${finderContent}</g>` +
-    `<g id="data">${dataContent}</g>` +
+    bg +
+    coloured +
     `</svg>`
   );
 }
