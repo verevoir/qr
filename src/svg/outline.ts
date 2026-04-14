@@ -148,7 +148,12 @@ export function toSvgOutline(
     diagonals,
     saddleNotch: diagonals ? 0.5 : 0,
   });
-  const lineThickness = 1 - 2 * (treatment.inset ?? 0);
+  // First output-style iteration: halve the default line thickness
+  // so line-like paths (Stage 3 capsule lines, Stage 6 X-pinwheel
+  // arms) render at 0.5 module width rather than full-cell. Thinner
+  // geometry reads more as "diagonal line art" and less as "filled
+  // QR". Treatment.inset still scales it when the user overrides.
+  const lineThickness = 0.5 * (1 - 2 * (treatment.inset ?? 0));
   const pathData = render(paths, {
     offset,
     lineThickness,

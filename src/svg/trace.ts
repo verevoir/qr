@@ -204,14 +204,26 @@ export function trace(
   const stripe = detectSteppedStripe(cells, diagonals);
   if (stripe) return [stripe];
 
-  const rectangle = detectSolidRectangle(cells);
-  if (rectangle) return [rectangle];
+  // When chamfering is active (saddleNotch > 0), we want consistency
+  // across all shape types — every outline corner should carry the
+  // same 45° treatment. Stage 5 and Stage 7 would otherwise emit
+  // sharp 90° rectangles, escaping the chamfer. So we skip them in
+  // chamfer mode and let Stage 8 handle solids + rings, producing
+  // octagons for solid rects and octagonal-hole rings for O-shapes.
+  const chamfered = (options.saddleNotch ?? 0) > 0;
+
+  if (!chamfered) {
+    const rectangle = detectSolidRectangle(cells);
+    if (rectangle) return [rectangle];
+  }
 
   const xSaddle = detectXSaddle(cells, diagonals);
   if (xSaddle) return [xSaddle];
 
-  const ring = detectRectangularRing(cells);
-  if (ring) return ring;
+  if (!chamfered) {
+    const ring = detectRectangularRing(cells);
+    if (ring) return ring;
+  }
 
   return unifiedTrace(cells, diagonals, options.saddleNotch ?? 0);
 }
