@@ -986,6 +986,49 @@ function edgeKey(x1: number, y1: number, x2: number, y2: number): string {
  * Identify every grid corner that's a saddle for this component.
  * Returned as a map of `"x,y"` → saddle kind.
  */
+/**
+ * Identify concave corners — grid vertices where exactly three of
+ * the four surrounding cells are in the component and one is
+ * absent. These are the "stepped" inward turns on a rectilinear
+ * outline. The returned map's value names which quadrant is
+ * absent; the chamfer direction follows from there.
+ *
+ * Saddles (2+2 diagonal) and concave corners (3+1) are structurally
+ * similar at the outline-tracing layer — both have four exposed
+ * faces converging on a single vertex and both respond well to the
+ * same face-truncation + chamfer-diagonal treatment, just with
+ * different chamfer directions.
+ */
+export function findConcaveCorners(
+  component: CellSet,
+): Map<string, 'NW' | 'NE' | 'SW' | 'SE'> {
+  const corners = new Map<string, 'NW' | 'NE' | 'SW' | 'SE'>();
+  const checked = new Set<string>();
+  for (const key of component) {
+    const [r, c] = parseCellKey(key);
+    for (let dr = 0; dr <= 1; dr++) {
+      for (let dc = 0; dc <= 1; dc++) {
+        const vx = c + dc;
+        const vy = r + dr;
+        const vk = `${vx},${vy}`;
+        if (checked.has(vk)) continue;
+        checked.add(vk);
+        const nw = component.has(cellKey(vy - 1, vx - 1));
+        const ne = component.has(cellKey(vy - 1, vx));
+        const sw = component.has(cellKey(vy, vx - 1));
+        const se = component.has(cellKey(vy, vx));
+        const present = (nw ? 1 : 0) + (ne ? 1 : 0) + (sw ? 1 : 0) + (se ? 1 : 0);
+        if (present !== 3) continue;
+        if (!nw) corners.set(vk, 'NW');
+        else if (!ne) corners.set(vk, 'NE');
+        else if (!sw) corners.set(vk, 'SW');
+        else corners.set(vk, 'SE');
+      }
+    }
+  }
+  return corners;
+}
+
 export function findSaddles(
   component: CellSet,
 ): Map<string, 'backslash' | 'slash'> {
@@ -1029,20 +1072,28 @@ export function findSaddles(
  */
 function buildChamferedBoundary(component: CellSet, notch: number): DualEdge[] {
   const saddles = findSaddles(component);
+  const concave = findConcaveCorners(component);
+  // Both saddle and concave-corner vertices trigger face truncation
+  // via `emitTruncated`. The chamfer / bridge diagonals are added in
+  // separate loops below.
+  const trimPoints = new Set<string>([
+    ...saddles.keys(),
+    ...concave.keys(),
+  ]);
   const edges: DualEdge[] = [];
   for (const key of component) {
     const [r, c] = parseCellKey(key);
     if (!component.has(cellKey(r - 1, c))) {
-      emitTruncated(c, r, c + 1, r, saddles, notch, edges);
+      emitTruncated(c, r, c + 1, r, trimPoints, notch, edges);
     }
     if (!component.has(cellKey(r, c + 1))) {
-      emitTruncated(c + 1, r, c + 1, r + 1, saddles, notch, edges);
+      emitTruncated(c + 1, r, c + 1, r + 1, trimPoints, notch, edges);
     }
     if (!component.has(cellKey(r + 1, c))) {
-      emitTruncated(c + 1, r + 1, c, r + 1, saddles, notch, edges);
+      emitTruncated(c + 1, r + 1, c, r + 1, trimPoints, notch, edges);
     }
     if (!component.has(cellKey(r, c - 1))) {
-      emitTruncated(c, r + 1, c, r, saddles, notch, edges);
+      emitTruncated(c, r + 1, c, r, trimPoints, notch, edges);
     }
   }
   for (const [vk, kind] of saddles) {
@@ -1063,6 +1114,23 @@ function buildChamferedBoundary(component: CellSet, notch: number): DualEdge[] {
       edges.push({ x1: vx + notch, y1: vy, x2: vx, y2: vy + notch });
     }
   }
+  // Concave chamfers — single 45° diagonal replacing each
+  // 3-present-1-absent stepped inward turn. Direction depends on
+  // which quadrant is absent; the incoming and outgoing truncated
+  // faces converge on the chamfer endpoints.
+  for (const [vk, absent] of concave) {
+    const [vx, vy] = vk.split(',').map(Number);
+    if (absent === 'NE') {
+      edges.push({ x1: vx, y1: vy - notch, x2: vx + notch, y2: vy });
+    } else if (absent === 'NW') {
+      edges.push({ x1: vx - notch, y1: vy, x2: vx, y2: vy - notch });
+    } else if (absent === 'SE') {
+      edges.push({ x1: vx + notch, y1: vy, x2: vx, y2: vy + notch });
+    } else {
+      // SW absent
+      edges.push({ x1: vx, y1: vy + notch, x2: vx - notch, y2: vy });
+    }
+  }
   return edges;
 }
 
@@ -1079,12 +1147,12 @@ function emitTruncated(
   y1: number,
   x2: number,
   y2: number,
-  saddles: Map<string, 'backslash' | 'slash'>,
+  trimPoints: ReadonlySet<string>,
   notch: number,
   edges: DualEdge[],
 ): void {
-  const startSaddle = saddles.has(`${x1},${y1}`);
-  const endSaddle = saddles.has(`${x2},${y2}`);
+  const startSaddle = trimPoints.has(`${x1},${y1}`);
+  const endSaddle = trimPoints.has(`${x2},${y2}`);
   if (!startSaddle && !endSaddle) {
     edges.push({ x1, y1, x2, y2 });
     return;
