@@ -170,3 +170,85 @@ Old `regions.ts` pipeline is not yet deleted — lives until Stage 11.
 - `saddleNotch` option on `TraceOptions`: `0` (default) keeps the
   original no-notch semantics for custom shape callers; `0.125` is
   what QR rendering passes to preserve empty cells at saddles.
+
+### Session 2 — 2026-04-14 (evening)
+
+Revisited the pipeline after the user observed that in their local
+slinqi build, the diagonal outline variants looked visually identical
+to the non-diagonal ones. Several architectural shifts followed.
+
+**Key change — per-component trace.** The Session 1 decision to
+route QR rendering through `traceUniform` (Stage 8 only, bypassing
+the creative Stage 3–7 detectors) was wrong for the user's intent.
+It preserved cells-exactly but produced the same stepped outlines
+for both diagonal and non-diagonal modes. Replaced with
+`traceComponents`: splits the cell set into connected components
+(4-connected by default, 8-connected when `diagonals` is on) and
+runs the full `trace()` pipeline on each — so 3-cell L components
+render as 3-vertex triangles, 5-cell X components as 8-vertex
+pinwheels, straight runs as 2-vertex capsule lines, and larger
+irregular components fall through to `unifiedTrace` for a faithful
+cell-border outline.
+
+**Render-layer split: `offset` vs `lineThickness`.** A single signed
+offset couldn't serve both geometries — regions at `0.5` would be
+oversized, lines at `0` would be invisible. Split into two options:
+- `offset` — signed perpendicular distance for region paths. `0`
+  renders cells exactly.
+- `lineThickness` — full width of line-like paths. Applied to
+  2-vertex degenerate capsules and multi-vertex paths with 180°
+  reversals (the X pinwheel's arm tips). Auto-detected via
+  `isLineLike` which scans the path for anti-parallel adjacent
+  edges.
+
+**`saddleNotch: 0.125` plumbed through `traceComponents`.** The
+immediate scan-failure cause after the per-component switch was that
+`saddleNotch` wasn't propagating — larger components fell through
+to the full-diagonal (notch 0) fallback, which has an adjacent-
+saddle edge overlap bug on dense QR patterns. Fixed by passing
+`saddleNotch: 0.125` explicitly through `traceComponents` in
+`toSvgOutline`. Chamfered saddles for fallback geometry; clean
+creative outputs for small components.
+
+**Colour plumbing via `SvgOptions.color`.** Added `color: { dark?,
+light?, background? }` to `SvgOptions` and `OutlineOptions`. Kept
+renderers colour-unaware — they continue to emit `fill="#000"` /
+`fill="#fff"` as defaults. Colour is applied once at the wrapping
+boundary in `shared.ts::applyColours`, via exact-token string
+substitution. Optional full-size background `<rect>` added when
+`background` is set. Considered `currentColor` + CSS custom
+properties for browser themability, but resvg doesn't propagate
+the `color` attribute through `currentColor` — broke the scan
+suite. String substitution trades inline CSS theming for
+self-contained SVG that renders consistently in any renderer.
+
+**Saddle invariant tests.** Tests now assert that Stage 4 triangles
+and the X pinwheel render with 0 and 4 saddles respectively, and
+that larger shapes (4-cell T, 7-cell I-beam, 4-row and 5-row
+pyramids, solid rectangles) have no saddles. `findSaddles` exposed
+as a public export for the assertions.
+
+**node-qrcode parity suite.** Installed `qrcode` as a devDep and
+wrote a parallel-test harness: 26 tests covering API signature
+parity (`toString` returns `Promise<string>` or accepts callback,
+`create` returns matrix-like object), matrix-dimension parity across
+URLs and error levels, decodability parity via rasterise+jsqr, and
+option-translation parity (`color.dark/light`, `errorCorrectionLevel`).
+Doubles as a regression guard against future node-qrcode updates.
+
+**Publish-ready structure.** Six dual-format (ESM + CJS) entry points:
+- `@verevoir/qr` — universal core.
+- `@verevoir/qr/node` — `toFile`, `toBuffer`.
+- `@verevoir/qr/web` — `svgToPng`, `downloadPng`, DOM helpers.
+- `@verevoir/qr/qrcode` — universal node-qrcode shim.
+- `@verevoir/qr/qrcode/node` — shim + Node bits.
+- `@verevoir/qr/qrcode/web` — shim + canvas bits.
+
+**Final tally: 219 tests across 7 files, all green.**
+- trace 63 (including 10 saddle invariant tests)
+- render 11
+- scan 63
+- qrcode-parity 26
+- svg 36
+- encode / png suites unchanged
+
