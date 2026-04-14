@@ -44,7 +44,7 @@ tested against trivial fixtures before touching QR codes at all.
 | 5  | Trace a square                                                | ✅     |
 | 6  | Saddles — X pattern as single 8-vertex self-intersecting loop | ✅     |
 | 7  | Hollows — rectangular O-ring with outer CW + inner CCW loops  | ✅     |
-| 8  | Unified `trace()` — single algorithm, multi-component         | ⏳     |
+| 8  | Unified `trace()` — fallback with saddle-diagonal handling    | ✅     |
 | 9  | Renderer (offset + corner treatment + curves)                 | ⏳     |
 | 10 | Wire new pipeline into `toSvgOutline`, scan tests green       | ⏳     |
 | 11 | Delete `regions.ts`, `treatments.ts`, `bad2.svg`              | ⏳     |
@@ -98,44 +98,35 @@ expands the outer boundary outward AND contracts the hole inward. The
 evenodd alternative requires the renderer to know about loop nesting;
 opposite-winding is self-contained per edge.
 
-### Stage 8 — design sketch (not yet implemented)
+### Stage 8 — implemented
 
-The per-shape detectors in Stages 3–7 stay as the primary entry points
-— they produce specific aesthetic outputs (e.g. the Stage 6 X collapses
-corner cells into tips, Stage 4 L-triangles replace the inner corner
-with a hypotenuse). Stage 8 is the **fallback** for anything the
-detectors don't match: arbitrary connected cell sets producing their
-true boundary outline.
+Built as `unifiedTrace(cells, diagonals)` in `src/svg/trace.ts`. Runs
+only when none of the Stage 3–7 detectors match. Pipeline:
 
-Algorithm (march-around-the-boundary with saddle handling):
+1. **Components** — `findComponents` flood-fills with
+   `clockwiseNeighbours` respecting the `diagonals` flag, so
+   diagonally-touching cells merge when enabled.
+2. **Boundary edges** — `buildBoundaryEdges` emits one directed edge
+   per 4-connected-exposed cell face with the filled cell on the
+   right of travel, giving outer CW + inner CCW winding automatically.
+3. **Saddle diagonals** — `applySaddleDiagonals` replaces the four
+   axis-aligned edges converging on each diagonal-touch corner with
+   two 45° diagonals that go all the way to the corner (no notch).
+   Dedup via a Set-keyed edge map, so saddles that share a cell face
+   (e.g. centre of an X pattern) remove it exactly once.
+4. **Chain** — `chainIntoLoops` walks directed edges tail-to-head into
+   closed loops. Every boundary vertex has degree 2 after saddle
+   replacement, so chaining is unambiguous.
+5. **Simplify** — `simplifyLoop` drops collinear intermediate
+   vertices via a cross-product-zero check.
 
-1. **Connected components** — flood-fill with `clockwiseNeighbours`
-   using the diagonals flag. Each component becomes one group of
-   paths (one outer + zero or more inner).
-2. **Per-component outline start** — topmost-leftmost cell's NW corner.
-3. **Walk CW**, emitting a vertex at each corner of the outline. Track
-   visited directed edges to avoid re-traversal.
-4. **Saddles** — at a diagonal-only touch point (the current tracer in
-   `regions.ts` handles these with a `DIAGONAL_NOTCH` — in the rebuild
-   they go all the way to the vertex, no notch). Emit a diagonal edge
-   `(v−1,v)→(v,v−1)` or similar depending on the saddle direction.
-5. **Holes** — after tracing the outer boundary, flood-fill remaining
-   *unvisited* empty cells inside the bounding box. Each contiguous
-   block of empty interior cells is traced CCW as an inner loop.
-6. **Isolated single cells** — Stage 9 renders these as a distinct dot
-   primitive; Stage 8 emits them in a separate list or as 4-vertex
-   closed paths per the Stage 9 decision (not yet made — see below).
+Isolated single cells trace as a 4-vertex closed square (naturally
+produced by `buildBoundaryEdges` on a 1-cell component). Stage 9 may
+choose to render them as a distinct dot primitive instead — the path
+representation doesn't preclude that, it just uses the uniform path
+shape at the trace layer.
 
-The old `regions.ts` has working boundary-chaining logic (directed
-edges on the dual grid) that can be adapted, but several things change:
-
-- Neighbour order must be clockwise-from-NE (the old code used
-  reading-order — a change the user called out in the critique).
-- Saddle bevels become full diagonals (no `DIAGONAL_NOTCH` fraction);
-  the offset rendering handles line thickness uniformly.
-- Winding convention is outer CW + inner CCW (old code used outer
-  CW + inner CCW *already* via directed edges, so this should carry
-  over cleanly).
+Old `regions.ts` pipeline is not yet deleted — lives until Stage 11.
 
 ### Parked for later
 
@@ -156,21 +147,27 @@ edges on the dual grid) that can be adapted, but several things change:
 - X saddle: user said 8 points in one closed loop; working through the
   geometry surfaced three interpretations — see Open Questions. Stopped
   before guessing.
-- **Landed**: Stages 0–7 with 46 tests green.
-  - `src/svg/trace.ts`: types, `cellKey`, `CLOCKWISE_4`/`CLOCKWISE_8`,
-    `clockwiseNeighbours()`, `trace()` handling empty / straight lines /
-    3-cell L triangles / solid rectangles / 3×3 X saddle / rectangular
-    O-rings, plus `UnsupportedShapeError`.
-  - `tests/trace.test.ts`: exhaustive per-stage coverage including CW
-    winding check (Stage 4), X-arm capsule invariant (Stage 6), and
-    outer-CW/inner-CCW winding assertion (Stage 7).
+- **Landed**: Stages 0–7 (46 tests) committed as `52c5eb4`; Stage 8
+  added on top (51 tests total).
+  - `src/svg/trace.ts`: Stage 8 `unifiedTrace` with connected
+    components, directed boundary edges (cell-on-right convention),
+    no-notch saddle diagonals, edge chaining, and collinear-vertex
+    simplification. Removed `UnsupportedShapeError` (no longer thrown
+    — every valid cell set now produces paths).
+  - `tests/trace.test.ts`: converted former negative "throws" tests
+    into positive "Stage 8 yields N paths" assertions, added a
+    Stage 8 describe block covering multi-component input, plus-shape,
+    T-shape, multi-hole, non-rectangular hole, and bent-with-saddle
+    cases.
 - User preference confirmed: keep token usage well below 100% so the
   parallel paid-work session can continue. Pace conservatively and
   offer natural break points.
-- **Next session pickup**: Stage 8 — the unified tracer. See the
-  design sketch section above. This is the keystone that unlocks
-  Stages 9–11 (renderer, QR wiring, cleanup). The old `regions.ts`
-  has reusable directed-edge-chaining logic; the critical changes are
-  clockwise-from-NE neighbour order, no-notch saddle diagonals, and
-  Stage 8 being a *fallback* (detectors in Stages 3–7 still run first
-  to produce their specific aesthetic outputs).
+- **Next session pickup**: Stage 9 — the renderer. Per-edge offset
+  outward (along left-hand perpendicular of travel direction), corner
+  treatments (sharp / rounded). Expected signature:
+  `render(paths, { offset, corners, ... }): string` returning an SVG
+  `<path d="...">` fragment. Special-case for 2-vertex degenerate
+  paths (lines as capsules) and self-intersecting paths (X from
+  Stage 6 — per-edge offset handles these naturally because each
+  edge's offset is local). Dot rendering decision to be made here
+  too.

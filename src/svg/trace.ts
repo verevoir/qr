@@ -157,9 +157,13 @@ export function clockwiseNeighbours(
  *   every edge, so Stage 9's per-edge offset inflates the outer
  *   boundary outward AND shrinks the hole inward (filled area
  *   thickens in both directions).
- *
- * Anything else throws `UnsupportedShapeError` until Stage 8's
- * general tracer subsumes all of the above.
+ * - **Stage 8 fallback** — anything else is routed through
+ *   `unifiedTrace()`, which partitions `cells` into connected
+ *   components (4-connected, or 8-connected when `diagonals` is on),
+ *   walks each component's directed-edge boundary, applies
+ *   no-notch saddle diagonals at corner-only touches when needed,
+ *   and chains the edges into closed loops. Outer loops wind
+ *   clockwise; any inner loops around holes wind counter-clockwise.
  */
 export function trace(
   cells: CellSet,
@@ -183,13 +187,7 @@ export function trace(
   const ring = detectRectangularRing(cells);
   if (ring) return ring;
 
-  throw new UnsupportedShapeError(
-    'trace: shape not yet supported (stage 8 unifies this)',
-  );
-}
-
-export class UnsupportedShapeError extends Error {
-  override name = 'UnsupportedShapeError';
+  return unifiedTrace(cells, diagonals);
 }
 
 // ---------------------------------------------------------------------------
@@ -548,4 +546,246 @@ function detectRectangularRing(cells: CellSet): Path[] | null {
     [holeMaxC + 1, holeMinR],
   ];
   return [outer, inner];
+}
+
+// ---------------------------------------------------------------------------
+// Stage 8 — unified fallback tracer
+// ---------------------------------------------------------------------------
+
+/**
+ * Fallback tracer. Handles any cell set the Stage 3–7 detectors don't
+ * claim, producing proper boundary outlines via directed-edge tracing.
+ *
+ * Pipeline per call:
+ *
+ * 1. **Components** — partition `cells` into connected components.
+ *    Uses 8-connectivity when `diagonals` is on so diagonally-touching
+ *    cells merge into a single component; 4-connectivity otherwise.
+ * 2. **Boundary edges** — for each cell in a component, emit one
+ *    directed edge per face exposed to a 4-connected-empty neighbour.
+ *    Edges are directed so the filled cell is on the right of travel:
+ *    top face east, right face south, bottom face west, left face
+ *    north. Outer loops therefore wind clockwise in SVG screen
+ *    coordinates (y-down) and hole loops wind counter-clockwise — the
+ *    same winding convention Stage 7 produces by hand.
+ * 3. **Saddle diagonals** — when `diagonals` is on and two
+ *    diagonally-opposite cells of the component share a corner while
+ *    the other two cells at that corner are empty, the four
+ *    axis-aligned faces converging on the shared corner are removed
+ *    and replaced with two 45° diagonal edges that bypass the pinch.
+ *    No notch — the diagonals touch the corner-cell corners directly,
+ *    because line thickness is applied downstream by per-edge offset.
+ * 4. **Chain** — walk edges tail-to-head into closed loops using a
+ *    start-vertex index; the directed-edge-with-cell-on-right
+ *    convention guarantees a balanced degree-2 graph so chaining is
+ *    deterministic.
+ * 5. **Simplify** — drop collinear intermediate vertices so straight
+ *    runs collapse to a single segment.
+ */
+function unifiedTrace(cells: CellSet, diagonals: boolean): readonly Path[] {
+  const paths: Path[] = [];
+  for (const component of findComponents(cells, diagonals)) {
+    let edges = buildBoundaryEdges(component);
+    if (diagonals) edges = applySaddleDiagonals(edges, component);
+    for (const loop of chainIntoLoops(edges)) {
+      paths.push(simplifyLoop(loop));
+    }
+  }
+  return paths;
+}
+
+/** Partition `cells` into connected components under the chosen rule. */
+function findComponents(cells: CellSet, diagonals: boolean): CellSet[] {
+  const visited = new Set<CellKey>();
+  const components: CellSet[] = [];
+  for (const start of cells) {
+    if (visited.has(start)) continue;
+    const component = new Set<CellKey>();
+    const stack: CellKey[] = [start];
+    while (stack.length > 0) {
+      const key = stack.pop() as CellKey;
+      if (visited.has(key)) continue;
+      visited.add(key);
+      component.add(key);
+      const [r, c] = parseCellKey(key);
+      for (const [nr, nc] of clockwiseNeighbours(
+        [r, c],
+        cells,
+        { diagonals },
+      )) {
+        const nk = cellKey(nr, nc);
+        if (!visited.has(nk)) stack.push(nk);
+      }
+    }
+    components.push(component);
+  }
+  return components;
+}
+
+// A directed boundary segment on the dual grid.
+type DualEdge = { x1: number; y1: number; x2: number; y2: number };
+
+/**
+ * Emit one directed edge per 4-connected-exposed cell face. Direction
+ * is chosen so the filled cell sits on the right of travel, which —
+ * in SVG screen coordinates where y grows downward — gives outer
+ * boundaries clockwise winding and hole boundaries counter-clockwise.
+ */
+function buildBoundaryEdges(component: CellSet): DualEdge[] {
+  const edges: DualEdge[] = [];
+  for (const key of component) {
+    const [r, c] = parseCellKey(key);
+    if (!component.has(cellKey(r - 1, c))) {
+      edges.push({ x1: c, y1: r, x2: c + 1, y2: r });
+    }
+    if (!component.has(cellKey(r, c + 1))) {
+      edges.push({ x1: c + 1, y1: r, x2: c + 1, y2: r + 1 });
+    }
+    if (!component.has(cellKey(r + 1, c))) {
+      edges.push({ x1: c + 1, y1: r + 1, x2: c, y2: r + 1 });
+    }
+    if (!component.has(cellKey(r, c - 1))) {
+      edges.push({ x1: c, y1: r + 1, x2: c, y2: r });
+    }
+  }
+  return edges;
+}
+
+/**
+ * Replace the zigzag that forms at each "saddle" vertex with a pair of
+ * 45° diagonals that bypass the pinch.
+ *
+ * A saddle is a grid corner `V = (vx, vy)` where the four cells
+ * surrounding it split into two diagonally-opposite pairs: one pair in
+ * the component, the other pair outside it. Two cases:
+ *
+ * - **`\` saddle** (NW and SE cells present, NE and SW absent): the
+ *   four axis-aligned edges that converge on V are removed and
+ *   replaced with diagonals
+ *     `(vx, vy−1) → (vx+1, vy)` (upper side, SE travel) and
+ *     `(vx, vy+1) → (vx−1, vy)` (lower side, NW travel).
+ * - **`/` saddle** (NE and SW cells present, NW and SE absent): the
+ *   four axis-aligned edges are replaced with
+ *     `(vx−1, vy) → (vx, vy−1)` (upper side, NE travel) and
+ *     `(vx+1, vy) → (vx, vy+1)` (lower side, SW travel).
+ *
+ * Removal is done via a `Set` keyed by the edge's directed endpoints,
+ * so when two saddles both claim the same face (which happens when a
+ * cell is sandwiched between two saddles, e.g. the centre cell of an
+ * X pattern) the face is removed only once and the book-keeping stays
+ * consistent.
+ */
+function applySaddleDiagonals(
+  edges: DualEdge[],
+  component: CellSet,
+): DualEdge[] {
+  const toRemove = new Set<string>();
+  const toAdd: DualEdge[] = [];
+  const checkedVertices = new Set<string>();
+
+  for (const key of component) {
+    const [r, c] = parseCellKey(key);
+    for (let dr = 0; dr <= 1; dr++) {
+      for (let dc = 0; dc <= 1; dc++) {
+        const vx = c + dc;
+        const vy = r + dr;
+        const vk = `${vx},${vy}`;
+        if (checkedVertices.has(vk)) continue;
+        checkedVertices.add(vk);
+
+        const nw = component.has(cellKey(vy - 1, vx - 1));
+        const ne = component.has(cellKey(vy - 1, vx));
+        const sw = component.has(cellKey(vy, vx - 1));
+        const se = component.has(cellKey(vy, vx));
+
+        if (nw && se && !ne && !sw) {
+          toRemove.add(edgeKey(vx, vy - 1, vx, vy)); //     NW.R
+          toRemove.add(edgeKey(vx, vy, vx - 1, vy)); //     NW.B
+          toRemove.add(edgeKey(vx, vy + 1, vx, vy)); //     SE.L
+          toRemove.add(edgeKey(vx, vy, vx + 1, vy)); //     SE.T
+          toAdd.push({ x1: vx, y1: vy - 1, x2: vx + 1, y2: vy });
+          toAdd.push({ x1: vx, y1: vy + 1, x2: vx - 1, y2: vy });
+        } else if (ne && sw && !nw && !se) {
+          toRemove.add(edgeKey(vx + 1, vy, vx, vy)); //     NE.B
+          toRemove.add(edgeKey(vx, vy, vx, vy - 1)); //     NE.L
+          toRemove.add(edgeKey(vx - 1, vy, vx, vy)); //     SW.T
+          toRemove.add(edgeKey(vx, vy, vx, vy + 1)); //     SW.R
+          toAdd.push({ x1: vx - 1, y1: vy, x2: vx, y2: vy - 1 });
+          toAdd.push({ x1: vx + 1, y1: vy, x2: vx, y2: vy + 1 });
+        }
+      }
+    }
+  }
+
+  if (toRemove.size === 0) return edges;
+  const kept = edges.filter(
+    (e) => !toRemove.has(edgeKey(e.x1, e.y1, e.x2, e.y2)),
+  );
+  return [...kept, ...toAdd];
+}
+
+function edgeKey(x1: number, y1: number, x2: number, y2: number): string {
+  return `${x1},${y1}->${x2},${y2}`;
+}
+
+/**
+ * Walk directed edges tail-to-head into closed loops. Every boundary
+ * vertex is visited by exactly one incoming and one outgoing edge
+ * (both after saddle replacement and in plain 4-connected regions),
+ * so chaining from any unused edge consumes a single closed loop with
+ * no ambiguity.
+ */
+function chainIntoLoops(edges: readonly DualEdge[]): Vertex[][] {
+  const byStart = new Map<string, DualEdge[]>();
+  for (const e of edges) {
+    const k = `${e.x1},${e.y1}`;
+    let list = byStart.get(k);
+    if (!list) {
+      list = [];
+      byStart.set(k, list);
+    }
+    list.push(e);
+  }
+  const used = new Set<DualEdge>();
+  const loops: Vertex[][] = [];
+  for (const start of edges) {
+    if (used.has(start)) continue;
+    const pts: Vertex[] = [[start.x1, start.y1]];
+    let cur: DualEdge | undefined = start;
+    while (cur && !used.has(cur)) {
+      used.add(cur);
+      pts.push([cur.x2, cur.y2]);
+      cur = byStart
+        .get(`${cur.x2},${cur.y2}`)
+        ?.find((e) => !used.has(e));
+    }
+    // Chain returns to start — drop the duplicate closing vertex.
+    if (pts.length >= 2) {
+      const last = pts[pts.length - 1];
+      if (last[0] === pts[0][0] && last[1] === pts[0][1]) pts.pop();
+    }
+    if (pts.length >= 3) loops.push(pts);
+  }
+  return loops;
+}
+
+/**
+ * Drop collinear intermediate vertices — a straight run of two or
+ * more colinear edges collapses into a single segment. Leaves loops
+ * with fewer than 3 remaining vertices untouched.
+ */
+function simplifyLoop(pts: readonly Vertex[]): Path {
+  const n = pts.length;
+  if (n <= 3) return pts.slice();
+  const result: Vertex[] = [];
+  for (let i = 0; i < n; i++) {
+    const [px, py] = pts[(i - 1 + n) % n];
+    const [cx, cy] = pts[i];
+    const [nx, ny] = pts[(i + 1) % n];
+    // Cross product zero ⇒ colinear ⇒ drop this vertex
+    if ((cx - px) * (ny - cy) !== (cy - py) * (nx - cx)) {
+      result.push(pts[i]);
+    }
+  }
+  return result.length >= 3 ? result : pts.slice();
 }
