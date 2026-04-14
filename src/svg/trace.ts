@@ -196,6 +196,9 @@ export function trace(
   const triangle = detectTriangle(cells, diagonals);
   if (triangle) return [triangle];
 
+  const stripe = detectSteppedStripe(cells, diagonals);
+  if (stripe) return [stripe];
+
   const rectangle = detectSolidRectangle(cells);
   if (rectangle) return [rectangle];
 
@@ -301,6 +304,147 @@ function detectStraightLine(cells: CellSet, diagonals: boolean): Path | null {
     [maxC + 1, minR],
     [minC, maxR + 1],
   ];
+}
+
+// ---------------------------------------------------------------------------
+// Stepped-stripe detection — a 2-wide diagonal band
+// ---------------------------------------------------------------------------
+
+/**
+ * Return the 4-vertex parallelogram path for a 2-wide stepped
+ * diagonal stripe, or `null` otherwise. Recognises both orientations
+ * of both slope directions:
+ *
+ * Horizontal steps, `\` slope:         Horizontal steps, `/` slope:
+ *   XX..                                 ..XX
+ *   .XX.                                 .XX.
+ *   ..XX                                 XX..
+ *
+ * Vertical steps, `\` slope:           Vertical steps, `/` slope:
+ *   X..                                  ..X
+ *   XX.                                  .XX
+ *   .XX                                  XX.
+ *   ..X                                  X..
+ *
+ * Visually these are thick diagonal bands; without this detector
+ * they fall through to Stage 8's stair-stepped outline, which renders
+ * as a sequence of offset rectangles rather than a clean
+ * parallelogram. Requires `diagonals: true` — the parallelogram's
+ * slanted sides only make sense when the user has opted into
+ * diagonal rendering.
+ */
+function detectSteppedStripe(
+  cells: CellSet,
+  diagonals: boolean,
+): Path | null {
+  if (!diagonals || cells.size < 4 || cells.size % 2 !== 0) return null;
+
+  // Try horizontal steps first — group by row
+  const byRow = new Map<number, number[]>();
+  for (const key of cells) {
+    const [r, c] = parseCellKey(key);
+    let arr = byRow.get(r);
+    if (!arr) {
+      arr = [];
+      byRow.set(r, arr);
+    }
+    arr.push(c);
+  }
+  const horiz = detectStripeAlongAxis(byRow);
+  if (horiz) {
+    const { offset, minAxis, n, dir } = horiz;
+    // Parallelogram vertices CW in SVG screen. `dir` is +1 for `\`
+    // slope (col shifts right per row), -1 for `/` (col shifts left).
+    if (dir > 0) {
+      return [
+        [offset, minAxis],
+        [offset + 2, minAxis],
+        [offset + n + 1, minAxis + n],
+        [offset + n - 1, minAxis + n],
+      ];
+    }
+    return [
+      [offset, minAxis],
+      [offset + 2, minAxis],
+      [offset - n + 3, minAxis + n],
+      [offset - n + 1, minAxis + n],
+    ];
+  }
+
+  // Vertical steps — group by column
+  const byCol = new Map<number, number[]>();
+  for (const key of cells) {
+    const [r, c] = parseCellKey(key);
+    let arr = byCol.get(c);
+    if (!arr) {
+      arr = [];
+      byCol.set(c, arr);
+    }
+    arr.push(r);
+  }
+  const vert = detectStripeAlongAxis(byCol);
+  if (vert) {
+    const { offset, minAxis, n, dir } = vert;
+    // In vertical orientation, (offset, minAxis) read (row, col) means
+    // the first column is at x=minAxis and its top cell's row is
+    // offset. Swap axes when emitting vertices.
+    if (dir > 0) {
+      return [
+        [minAxis, offset],
+        [minAxis, offset + 2],
+        [minAxis + n, offset + n + 1],
+        [minAxis + n, offset + n - 1],
+      ];
+    }
+    return [
+      [minAxis, offset],
+      [minAxis, offset + 2],
+      [minAxis + n, offset - n + 3],
+      [minAxis + n, offset - n + 1],
+    ];
+  }
+
+  return null;
+}
+
+/**
+ * Shared logic for both orientations of `detectSteppedStripe`. Given
+ * a map of axis-major-key → sorted list of cross-axis positions, tests
+ * whether the cells form a 2-wide stripe that shifts by exactly ±1 per
+ * axis step.
+ */
+function detectStripeAlongAxis(
+  groups: Map<number, number[]>,
+): { offset: number; minAxis: number; n: number; dir: 1 | -1 } | null {
+  const axisKeys = [...groups.keys()].sort((a, b) => a - b);
+  const n = axisKeys.length;
+  if (n < 2) return null;
+
+  // All axis positions must be contiguous
+  for (let i = 1; i < n; i++) {
+    if (axisKeys[i] !== axisKeys[i - 1] + 1) return null;
+  }
+
+  const firstCross: number[] = [];
+  for (const k of axisKeys) {
+    const cross = (groups.get(k) as number[]).slice().sort((a, b) => a - b);
+    if (cross.length !== 2) return null;
+    if (cross[1] !== cross[0] + 1) return null;
+    firstCross.push(cross[0]);
+  }
+
+  const step = firstCross[1] - firstCross[0];
+  if (step !== 1 && step !== -1) return null;
+  for (let i = 2; i < n; i++) {
+    if (firstCross[i] !== firstCross[0] + step * i) return null;
+  }
+
+  return {
+    offset: firstCross[0],
+    minAxis: axisKeys[0],
+    n,
+    dir: step as 1 | -1,
+  };
 }
 
 // ---------------------------------------------------------------------------

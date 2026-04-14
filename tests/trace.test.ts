@@ -820,6 +820,63 @@ describe('saddle invariants', () => {
 
   // The I-beam adds two more concave corners on top of the T — all
   // four stem-meets-cap corners exercised simultaneously.
+  it('a 2-wide stepped diagonal stripe renders as a 4-vertex parallelogram', () => {
+    // User's case — 2 cells per row, stepping right by 1 per row.
+    // Without the stepped-stripe detector this falls through to
+    // Stage 8 and emits a 12-vertex stair-step outline.
+    const stripe = grid(['XX..', '.XX.', '..XX']);
+    const paths = trace(stripe, { diagonals: true });
+    expect(paths).toHaveLength(1);
+    expect(paths[0]).toEqual([
+      [0, 0],
+      [2, 0],
+      [4, 3],
+      [2, 3],
+    ]);
+  });
+
+  it('2-wide stripe with `/` slope also renders as a parallelogram', () => {
+    const stripe = grid(['..XX', '.XX.', 'XX..']);
+    const paths = trace(stripe, { diagonals: true });
+    expect(paths).toHaveLength(1);
+    expect(paths[0]).toEqual([
+      [2, 0],
+      [4, 0],
+      [2, 3],
+      [0, 3],
+    ]);
+  });
+
+  it('vertical 2-wide stripes also collapse to parallelograms', () => {
+    // Vertical steps, `\` slope — 2 cells per column, stepping down
+    const vertStripe = grid(['X..', 'XX.', '.XX', '..X']);
+    const paths = trace(vertStripe, { diagonals: true });
+    expect(paths).toHaveLength(1);
+    expect(paths[0]).toHaveLength(4);
+  });
+
+  it('stepped stripe without diagonals opts out of the parallelogram', () => {
+    // Without diagonals enabled we stay with the faithful stepped
+    // outline — no implicit slanted sides.
+    const stripe = grid(['XX..', '.XX.', '..XX']);
+    const paths = trace(stripe);
+    expect(paths).toHaveLength(1);
+    expect(paths[0].length).toBeGreaterThan(4);
+  });
+
+  it('2-row stripe is a valid parallelogram (minimum N)', () => {
+    // XX. \n .XX  →  4-cell stepped stripe
+    const stripe = grid(['XX.', '.XX']);
+    const paths = trace(stripe, { diagonals: true });
+    expect(paths).toHaveLength(1);
+    expect(paths[0]).toEqual([
+      [0, 0],
+      [2, 0],
+      [3, 2],
+      [1, 2],
+    ]);
+  });
+
   it('a 7-cell I-beam has no saddles in either orientation', () => {
     // Horizontal I-beam
     const horizontal = grid(['XXX', '.X.', 'XXX']);
