@@ -148,12 +148,12 @@ export function toSvgOutline(
     diagonals,
     saddleNotch: diagonals ? 0.5 : 0,
   });
-  // First output-style iteration: halve the default line thickness
-  // so line-like paths (Stage 3 capsule lines, Stage 6 X-pinwheel
-  // arms) render at 0.5 module width rather than full-cell. Thinner
-  // geometry reads more as "diagonal line art" and less as "filled
-  // QR". Treatment.inset still scales it when the user overrides.
-  const lineThickness = 0.5 * (1 - 2 * (treatment.inset ?? 0));
+  // Second iteration: line-like paths render at 0.25 module width
+  // (quarter-cell). Reads cleanly as stroked line art while still
+  // scanning reliably — the axis of every line-like path passes
+  // through module centres, so scanners pick up the modules even at
+  // this narrow thickness. `treatment.inset` still scales.
+  const lineThickness = 0.25 * (1 - 2 * (treatment.inset ?? 0));
   const pathData = render(paths, {
     offset,
     lineThickness,
