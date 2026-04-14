@@ -148,12 +148,16 @@ export function toSvgOutline(
     diagonals,
     saddleNotch: diagonals ? 0.5 : 0,
   });
-  // Second iteration: line-like paths render at 0.25 module width
-  // (quarter-cell). Reads cleanly as stroked line art while still
-  // scanning reliably — the axis of every line-like path passes
-  // through module centres, so scanners pick up the modules even at
-  // this narrow thickness. `treatment.inset` still scales.
-  const lineThickness = 0.25 * (1 - 2 * (treatment.inset ?? 0));
+  // Third iteration: line-like paths at 0.125 (one-eighth cell).
+  // NB: this thins the Stage 3 capsule lines and the Stage 6
+  // X-pinwheel arms; it does NOT thin the Stage 8 region edges
+  // (saddle bridges, concave/convex chamfers). The "diagonal
+  // thickness" a caller sees on bigger components is the filled
+  // region's perpendicular extent, which is independent of
+  // lineThickness. A proper fix wants a detector that pulls
+  // diagonal runs out of bigger components and renders them as
+  // stroked lines — deferred as a future style variant.
+  const lineThickness = 0.125 * (1 - 2 * (treatment.inset ?? 0));
   const pathData = render(paths, {
     offset,
     lineThickness,
