@@ -999,6 +999,50 @@ function edgeKey(x1: number, y1: number, x2: number, y2: number): string {
  * same face-truncation + chamfer-diagonal treatment, just with
  * different chamfer directions.
  */
+/**
+ * Identify convex corners — vertices where exactly ONE of the four
+ * surrounding cells is in the component. These are the outer
+ * corner tips of isolated cells or cell jags jutting out of a
+ * bigger shape. The returned map's value names which quadrant is
+ * present (the cell whose tip is being chamfered).
+ *
+ * Same face-truncation + chamfer-diagonal treatment as concave
+ * corners and saddles, just with directions flipped so the chamfer
+ * cuts into the cell from its outer tip rather than filling a
+ * notch. Together with the concave and saddle cases, this covers
+ * every corner configuration on a rectilinear outline with an
+ * implied 45° slant.
+ */
+export function findConvexCorners(
+  component: CellSet,
+): Map<string, 'NW' | 'NE' | 'SW' | 'SE'> {
+  const corners = new Map<string, 'NW' | 'NE' | 'SW' | 'SE'>();
+  const checked = new Set<string>();
+  for (const key of component) {
+    const [r, c] = parseCellKey(key);
+    for (let dr = 0; dr <= 1; dr++) {
+      for (let dc = 0; dc <= 1; dc++) {
+        const vx = c + dc;
+        const vy = r + dr;
+        const vk = `${vx},${vy}`;
+        if (checked.has(vk)) continue;
+        checked.add(vk);
+        const nw = component.has(cellKey(vy - 1, vx - 1));
+        const ne = component.has(cellKey(vy - 1, vx));
+        const sw = component.has(cellKey(vy, vx - 1));
+        const se = component.has(cellKey(vy, vx));
+        const present = (nw ? 1 : 0) + (ne ? 1 : 0) + (sw ? 1 : 0) + (se ? 1 : 0);
+        if (present !== 1) continue;
+        if (nw) corners.set(vk, 'NW');
+        else if (ne) corners.set(vk, 'NE');
+        else if (sw) corners.set(vk, 'SW');
+        else corners.set(vk, 'SE');
+      }
+    }
+  }
+  return corners;
+}
+
 export function findConcaveCorners(
   component: CellSet,
 ): Map<string, 'NW' | 'NE' | 'SW' | 'SE'> {
@@ -1073,12 +1117,15 @@ export function findSaddles(
 function buildChamferedBoundary(component: CellSet, notch: number): DualEdge[] {
   const saddles = findSaddles(component);
   const concave = findConcaveCorners(component);
-  // Both saddle and concave-corner vertices trigger face truncation
-  // via `emitTruncated`. The chamfer / bridge diagonals are added in
-  // separate loops below.
+  const convex = findConvexCorners(component);
+  // Saddles, concave corners, and convex corners all truncate the
+  // faces that converge on them via `emitTruncated`. The actual
+  // chamfer or bridge diagonals are added in separate loops below,
+  // each with orientation-specific geometry.
   const trimPoints = new Set<string>([
     ...saddles.keys(),
     ...concave.keys(),
+    ...convex.keys(),
   ]);
   const edges: DualEdge[] = [];
   for (const key of component) {
@@ -1129,6 +1176,22 @@ function buildChamferedBoundary(component: CellSet, notch: number): DualEdge[] {
     } else {
       // SW absent
       edges.push({ x1: vx, y1: vy + notch, x2: vx - notch, y2: vy });
+    }
+  }
+  // Convex chamfers — single 45° diagonal capping each
+  // 1-present-3-absent outer corner tip. Direction follows the CW
+  // traversal's right turn around the corner.
+  for (const [vk, present] of convex) {
+    const [vx, vy] = vk.split(',').map(Number);
+    if (present === 'NW') {
+      edges.push({ x1: vx, y1: vy - notch, x2: vx - notch, y2: vy });
+    } else if (present === 'NE') {
+      edges.push({ x1: vx + notch, y1: vy, x2: vx, y2: vy - notch });
+    } else if (present === 'SW') {
+      edges.push({ x1: vx - notch, y1: vy, x2: vx, y2: vy + notch });
+    } else {
+      // SE present
+      edges.push({ x1: vx, y1: vy + notch, x2: vx + notch, y2: vy });
     }
   }
   return edges;
