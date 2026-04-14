@@ -645,6 +645,33 @@ function unifiedTrace(
   return paths;
 }
 
+/**
+ * Trace each connected component of `cells` separately through the full
+ * `trace()` pipeline, so the Stage 3–7 creative detectors get their
+ * chance on each component's shape rather than being defeated by
+ * whole-grid inputs that never match any single-shape pattern.
+ *
+ * This is what `toSvgOutline` uses: a QR matrix's data modules form
+ * many disjoint components (plus some connected clusters). Per-
+ * component tracing means 3-cell L components render as triangles,
+ * 5-cell X components as pinwheels, straight runs as degenerate
+ * capsule lines, and larger components fall through to `unifiedTrace`
+ * for a faithful cell-border outline.
+ */
+export function traceComponents(
+  cells: CellSet,
+  options: TraceOptions = {},
+): readonly Path[] {
+  const diagonals = options.diagonals ?? false;
+  const paths: Path[] = [];
+  for (const component of findComponents(cells, diagonals)) {
+    for (const path of trace(component, options)) {
+      paths.push(path);
+    }
+  }
+  return paths;
+}
+
 /** Partition `cells` into connected components under the chosen rule. */
 function findComponents(cells: CellSet, diagonals: boolean): CellSet[] {
   const visited = new Set<CellKey>();
@@ -887,8 +914,11 @@ function buildChamferedBoundary(
 
 /**
  * Emit a single cell face, truncated by `notch` at whichever endpoint(s)
- * lie on a saddle. If both endpoints are saddles the middle portion is
- * emitted; if the resulting segment has zero length it's omitted.
+ * lie on a saddle. If the trim at each end sums to more than the face
+ * length (which happens at large notches on short faces — e.g. the
+ * faces of the centre cell of an X pattern at `notch >= 0.5`), the
+ * face is consumed entirely by the two adjacent chamfers and nothing
+ * is emitted. Chaining picks up from the chamfer endpoints directly.
  */
 function emitTruncated(
   x1: number,
@@ -908,17 +938,19 @@ function emitTruncated(
   const dx = x2 - x1;
   const dy = y2 - y1;
   const len = Math.sqrt(dx * dx + dy * dy);
+  const trimStart = startSaddle ? notch : 0;
+  const trimEnd = endSaddle ? notch : 0;
+  // If the two chamfers overlap or exactly meet, the face disappears
+  // entirely. The chamfer endpoints are the chain's new anchors.
+  if (trimStart + trimEnd >= len - 1e-12) return;
   const ux = dx / len;
   const uy = dy / len;
-  const sx = startSaddle ? x1 + ux * notch : x1;
-  const sy = startSaddle ? y1 + uy * notch : y1;
-  const ex = endSaddle ? x2 - ux * notch : x2;
-  const ey = endSaddle ? y2 - uy * notch : y2;
-  const dxs = ex - sx;
-  const dys = ey - sy;
-  if (dxs * dxs + dys * dys > 1e-12) {
-    edges.push({ x1: sx, y1: sy, x2: ex, y2: ey });
-  }
+  edges.push({
+    x1: x1 + ux * trimStart,
+    y1: y1 + uy * trimStart,
+    x2: x2 - ux * trimEnd,
+    y2: y2 - uy * trimEnd,
+  });
 }
 
 /**

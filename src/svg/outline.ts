@@ -1,6 +1,6 @@
 import type { QrMatrix, CornerStyle } from '../types.js';
 import { renderCorners } from './corners.js';
-import { traceUniform, cellKey } from './trace.js';
+import { traceComponents, cellKey } from './trace.js';
 import type { CellKey, CellSet } from './trace.js';
 import { render } from './render.js';
 
@@ -77,10 +77,14 @@ export interface OutlineOptions {
 /**
  * Render a QR matrix using the two-layer trace + render pipeline.
  *
- * The data modules go through `traceUniform` (the Stage 8 faithful
- * tracer — no creative Stage 3–7 shape reinterpretations, so QR
- * cells render cells-exactly at `offset: 0`) and then `render`,
- * which inflates each path edge outward by the requested offset.
+ * The data modules go through `traceComponents` — which splits the
+ * cell set into connected components and runs each through the full
+ * `trace()` pipeline (Stage 3–7 creative detectors first, Stage 8
+ * faithful outline as fallback). Small diagonally-connected shapes
+ * render as their clean geometric form; larger or less regular
+ * components render as cell-border outlines. The resulting paths
+ * go through `render`, which inflates each edge outward by the
+ * requested offset.
  *
  * The finder patterns are rendered separately by `renderCorners`
  * because they always want an identifiable three-square look that's
@@ -113,18 +117,25 @@ export function toSvgOutline(
   const finderOnlyQr: QrMatrix = { ...qr, alignmentCoordinates: [] };
   const finderContent = renderCorners(finderOnlyQr, cornerStyle);
 
-  // Data modules + alignment patterns via trace + render. At each
-  // saddle corner, a tiny 0.125-module chamfer trims the two filled
-  // cells — the visual "diagonal connection" lives in that narrow
-  // bevel, leaving the empty cells between them still empty so QR
-  // scanners see the correct module pattern.
+  // Data modules + alignment patterns via trace + render, component
+  // by component. Small diagonally-connected components that match
+  // the Stage 3–7 creative detectors render as their clean shape:
+  // 3-cell L → 3-vertex triangle (hypotenuse replaces the concave
+  // stair-step); 5-cell X → 8-vertex pinwheel with four arms meeting
+  // at a single centre point; straight runs → 2-vertex capsule lines.
+  // Components that don't match a detector fall through to the
+  // Stage 8 unified tracer for a faithful cell-border outline.
   const cells = buildDataCellSet(qr);
-  const paths = traceUniform(cells, {
-    diagonals,
-    saddleNotch: diagonals ? 0.125 : 0,
-  });
+  const paths = traceComponents(cells, { diagonals });
+  // Line-like shapes (degenerate 2-vertex capsules, X-pinwheel arms)
+  // need to be thin enough that they don't bleed into adjacent empty
+  // cells at diagonal joins — otherwise scanners lose the pattern.
+  // 0.65 of a cell width has held up against all URL lengths in
+  // the scan suite; finer tuning is a follow-up.
+  const lineThickness = 1 - 2 * (treatment.inset ?? 0);
   const pathData = render(paths, {
     offset,
+    lineThickness: diagonals ? 0.65 : lineThickness,
     corners,
     translate: [1, 1], //                      1-module padding inside the viewBox
   });

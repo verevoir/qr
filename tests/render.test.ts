@@ -21,7 +21,7 @@ describe('render', () => {
     expect(render([[[0, 0]] as unknown as Path])).toBe('');
   });
 
-  it('clockwise unit square offset by 0.5 expands outward uniformly', () => {
+  it('clockwise unit square at offset 0.5 expands outward uniformly', () => {
     // Unit square at (1..2, 1..2) CW. Each 90° corner expands to
     // `offset * √2` along the outward bisector = 0.5 units on each axis.
     const square: Path = [
@@ -35,7 +35,7 @@ describe('render', () => {
     );
   });
 
-  it('offset of zero leaves vertex positions untouched', () => {
+  it('offset of zero leaves region vertex positions untouched', () => {
     const square: Path = [
       [1, 1],
       [2, 1],
@@ -48,28 +48,36 @@ describe('render', () => {
   });
 
   it('degenerate 2-vertex horizontal line becomes a flat-capped capsule', () => {
-    // Line from (0, 0.5) to (3, 0.5). Both endpoints are 180°
-    // reversals, so each emits two flat-cap vertices. Resulting
-    // rectangle covers (0..3, 0..1) — one full module tall at offset
-    // 0.5 on each side.
+    // Line from (0, 0.5) to (3, 0.5). 2-vertex path is line-like,
+    // so it uses `lineThickness / 2` as its offset regardless of
+    // the `offset` option. Default lineThickness = 1.0 → half-width
+    // 0.5, capsule covers y ∈ [0, 1].
     const line: Path = [
       [0, 0.5],
       [3, 0.5],
     ];
-    expect(render([line], { offset: 0.5 })).toBe(
-      'M0,1L0,0L3,0L3,1Z',
+    expect(render([line])).toBe('M0,1L0,0L3,0L3,1Z');
+  });
+
+  it('thinner lineThickness shrinks capsules without touching regions', () => {
+    const line: Path = [
+      [0, 0.5],
+      [3, 0.5],
+    ];
+    // lineThickness 0.4 → half-width 0.2, capsule covers y ∈ [0.3, 0.7]
+    expect(render([line], { lineThickness: 0.4 })).toBe(
+      'M0,0.7L0,0.3L3,0.3L3,0.7Z',
     );
   });
 
   it('degenerate diagonal line becomes a rotated-rectangle capsule', () => {
-    // `\` diagonal from (0, 0) to (2, 2). Offset perpendicular to
-    // travel direction is ±(1, -1)/√2. Flat caps at each end.
+    // `\` diagonal from (0, 0) to (2, 2). With lineThickness = √2
+    // the perpendicular offset is ±(1, -1)/√2 × √2/2 = ±0.5 each axis.
     const line: Path = [
       [0, 0],
       [2, 2],
     ];
-    const d = render([line], { offset: Math.SQRT1_2 });
-    // Expected corners (CCW): (-0.5, 0.5), (0.5, -0.5), (2.5, 1.5), (1.5, 2.5)
+    const d = render([line], { lineThickness: Math.SQRT2 });
     expect(d).toBe('M-0.5,0.5L0.5,-0.5L2.5,1.5L1.5,2.5Z');
   });
 
@@ -144,9 +152,11 @@ describe('render', () => {
 
   it('X-saddle pinwheel: 4 flat-capped tips + 4 centre miter points', () => {
     // The Stage 6 X at the origin: tips at the 4 outer corners,
-    // centre coincident visits at (1.5, 1.5). Each tip is a 180°
-    // reversal (flat cap → 2 vertices); each centre visit is a
-    // left-turn corner (1 miter vertex). 12 output vertices total.
+    // centre coincident visits at (1.5, 1.5). The path contains
+    // 180° reversals (tips), so it's line-like and uses
+    // `lineThickness / 2` rather than `offset`. Each tip is a flat
+    // cap (2 vertices); each centre visit is a miter (1 vertex).
+    // 12 output vertices total.
     const x: Path = [
       [0, 0],
       [1.5, 1.5],
@@ -157,15 +167,14 @@ describe('render', () => {
       [0, 3],
       [1.5, 1.5],
     ];
-    const d = render([x], { offset: 0.25 });
-    // Count subpath commands: should be 1 M + 11 L + 1 Z
+    const d = render([x], { lineThickness: 0.5 });
+    // 1 M + 11 L + 1 Z
     expect((d.match(/M/g) ?? []).length).toBe(1);
     expect((d.match(/L/g) ?? []).length).toBe(11);
     expect(d.endsWith('Z')).toBe(true);
-    // Two of the centre miter points — at tipIdx 1 and 5 (NW-to-NE
-    // and SE-to-SW transitions) — lie above and below centre along
-    // the y-axis. Verify presence in the emitted string.
-    // Shift magnitude: offset * √2 ≈ 0.3536 for the 90° corner
+    // At lineThickness 0.5, half-width = 0.25, corner offset along
+    // 90° bisector = 0.25 * √2 ≈ 0.3536. So the centre miter points
+    // sit at (1.5, 1.1464) north of centre and (1.5, 1.8536) south.
     expect(d).toContain('1.5,1.1464'); //   north of centre
     expect(d).toContain('1.5,1.8536'); //   south of centre
   });

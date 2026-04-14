@@ -41,14 +41,23 @@ import type { Path, Vertex } from './trace.js';
 
 export interface RenderOptions {
   /**
-   * Signed perpendicular distance applied to every edge. Positive
-   * expands outward (grows outer boundaries, shrinks holes); negative
-   * shrinks inward. Default `0.5` — a full module thickness for a
-   * degenerate 2-vertex line, or expand-by-half-module for region
-   * outlines. Pass `0` to render the trace exactly (cells-as-cells
-   * for region outlines; zero-width for 2-vertex lines).
+   * Signed perpendicular distance applied to every edge of a region
+   * path. Positive expands outward (grows outer boundaries, shrinks
+   * holes); negative shrinks inward. Default `0` — renders region
+   * outlines cells-exactly. Does NOT apply to line-like paths
+   * (2-vertex capsules, self-intersecting arm pinwheels) — those use
+   * `lineThickness` instead, so thick capsules stay thick regardless
+   * of whether you're inflating or deflating the region shapes.
    */
   readonly offset?: number;
+  /**
+   * Full width of a line-like path in module units — applied to
+   * 2-vertex capsule lines and to multi-vertex paths that contain
+   * 180° reversals (Stage 6 X pinwheel, etc.). Default `1.0` (full
+   * cell width). Reduce for "thin" variants — the narrower the line,
+   * the less dark area spills into light cells at diagonal joins.
+   */
+  readonly lineThickness?: number;
   /**
    * Optional `[x, y]` translation applied to every output coordinate.
    * Useful for padding the trace inside a larger SVG viewBox without
@@ -80,16 +89,55 @@ export function render(
   paths: readonly Path[],
   options: RenderOptions = {},
 ): string {
-  const offset = options.offset ?? 0.5;
+  const offset = options.offset ?? 0;
+  const lineThickness = options.lineThickness ?? 1;
+  const lineOffset = lineThickness / 2;
   const [tx, ty] = options.translate ?? [0, 0];
   const rounded =
     options.corners === 'rounded' && (options.cornerRadius ?? 0.25) > 0;
   const cornerRadius = options.cornerRadius ?? 0.25;
   let d = '';
   for (const path of paths) {
-    d += renderPath(path, offset, tx, ty, rounded, cornerRadius);
+    // Line-like paths (2-vertex degenerate capsules, multi-vertex
+    // paths with 180° reversals) use the line thickness's
+    // half-width as their per-edge offset so they inflate into a
+    // visible capsule. Region paths use the signed `offset` option
+    // directly, so `offset: 0` renders regions cells-exactly while
+    // lines still render at the requested thickness.
+    const edgeOffset = isLineLike(path) ? lineOffset : offset;
+    d += renderPath(path, edgeOffset, tx, ty, rounded, cornerRadius);
   }
   return d;
+}
+
+/**
+ * Detect whether a path's edges travel in self-opposing directions.
+ * True for 2-vertex degenerate lines (always line-like) and for
+ * multi-vertex paths that contain any 180° reversal — characteristic
+ * of the X saddle's arm tips and other arm-and-centre shapes the
+ * trace layer emits as capsule families.
+ */
+function isLineLike(path: Path): boolean {
+  const n = path.length;
+  if (n === 2) return true;
+  for (let i = 0; i < n; i++) {
+    const prev = path[(i - 1 + n) % n];
+    const curr = path[i];
+    const next = path[(i + 1) % n];
+    const d1x = curr[0] - prev[0];
+    const d1y = curr[1] - prev[1];
+    const d2x = next[0] - curr[0];
+    const d2y = next[1] - curr[1];
+    const d1len2 = d1x * d1x + d1y * d1y;
+    const d2len2 = d2x * d2x + d2y * d2y;
+    if (d1len2 < 1e-12 || d2len2 < 1e-12) continue;
+    const dot = d1x * d2x + d1y * d2y;
+    // 180° reversal ⇒ dot = −√(|d1|² × |d2|²) ⇒ dot² = |d1|²|d2|² AND dot < 0
+    if (dot < 0 && Math.abs(dot * dot - d1len2 * d2len2) < 1e-9) {
+      return true;
+    }
+  }
+  return false;
 }
 
 interface OffsetVertex {
