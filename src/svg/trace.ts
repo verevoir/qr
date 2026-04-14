@@ -78,6 +78,24 @@ export interface TraceOptions {
    * only cells sharing a full edge (N / E / S / W) are connected.
    */
   readonly diagonals?: boolean;
+  /**
+   * How much of each saddle corner to chamfer with a diagonal, in
+   * module units. Only meaningful when `diagonals` is true.
+   *
+   * - `0` (default) — the diagonal runs corner-to-corner, fully bridging
+   *   the two diagonally-adjacent cells. Matches the "no-notch" style
+   *   described for custom shapes (`\`, `/`, X saddle).
+   * - `> 0` — the corner of each filled cell that meets the saddle is
+   *   trimmed by this much, and a short 45° diagonal spans the trim.
+   *   The two cells are NOT geometrically bridged — they remain
+   *   topologically one component (for boundary-tracing purposes) but
+   *   most of the empty-cell space at the saddle stays empty.
+   *
+   * For QR rendering, pass `~0.125`: the cells remain visually linked
+   * by a faint diagonal at each saddle, but scanners still see the
+   * empty cells between them as empty.
+   */
+  readonly saddleNotch?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -187,7 +205,7 @@ export function trace(
   const ring = detectRectangularRing(cells);
   if (ring) return ring;
 
-  return unifiedTrace(cells, diagonals);
+  return unifiedTrace(cells, diagonals, options.saddleNotch ?? 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -582,11 +600,44 @@ function detectRectangularRing(cells: CellSet): Path[] | null {
  * 5. **Simplify** — drop collinear intermediate vertices so straight
  *    runs collapse to a single segment.
  */
-function unifiedTrace(cells: CellSet, diagonals: boolean): readonly Path[] {
+/**
+ * Trace a cell set using only the Stage 8 fallback, skipping the
+ * Stage 3–7 creative detectors. Emits faithful cell-border outlines
+ * for every connected component — no line-as-2-vertex collapse, no
+ * triangle-for-L, no X-saddle pinwheel — which is what callers who
+ * want "cells exactly" (e.g. the QR outline renderer) need.
+ *
+ * Public variant of the internal `unifiedTrace` helper.
+ */
+export function traceUniform(
+  cells: CellSet,
+  options: TraceOptions = {},
+): readonly Path[] {
+  return unifiedTrace(
+    cells,
+    options.diagonals ?? false,
+    options.saddleNotch ?? 0,
+  );
+}
+
+function unifiedTrace(
+  cells: CellSet,
+  diagonals: boolean,
+  notch: number,
+): readonly Path[] {
   const paths: Path[] = [];
   for (const component of findComponents(cells, diagonals)) {
-    let edges = buildBoundaryEdges(component);
-    if (diagonals) edges = applySaddleDiagonals(edges, component);
+    let edges: DualEdge[];
+    if (diagonals && notch > 0) {
+      // Saddle-aware: truncate each cell face at the notch on any
+      // saddle endpoint, then add the chamfer diagonals separately.
+      // Correctly handles adjacent saddles that share a cell face
+      // (the middle portion of the face is preserved).
+      edges = buildChamferedBoundary(component, notch);
+    } else {
+      edges = buildBoundaryEdges(component);
+      if (diagonals) edges = applySaddleDiagonals(edges, component, notch);
+    }
     for (const loop of chainIntoLoops(edges)) {
       paths.push(simplifyLoop(loop));
     }
@@ -678,10 +729,12 @@ function buildBoundaryEdges(component: CellSet): DualEdge[] {
 function applySaddleDiagonals(
   edges: DualEdge[],
   component: CellSet,
+  notch: number,
 ): DualEdge[] {
   const toRemove = new Set<string>();
   const toAdd: DualEdge[] = [];
   const checkedVertices = new Set<string>();
+  const a = notch;
 
   for (const key of component) {
     const [r, c] = parseCellKey(key);
@@ -703,15 +756,42 @@ function applySaddleDiagonals(
           toRemove.add(edgeKey(vx, vy, vx - 1, vy)); //     NW.B
           toRemove.add(edgeKey(vx, vy + 1, vx, vy)); //     SE.L
           toRemove.add(edgeKey(vx, vy, vx + 1, vy)); //     SE.T
-          toAdd.push({ x1: vx, y1: vy - 1, x2: vx + 1, y2: vy });
-          toAdd.push({ x1: vx, y1: vy + 1, x2: vx - 1, y2: vy });
+          if (a === 0) {
+            // Full diagonals: corner-to-corner, bridging both cells
+            toAdd.push({ x1: vx, y1: vy - 1, x2: vx + 1, y2: vy });
+            toAdd.push({ x1: vx, y1: vy + 1, x2: vx - 1, y2: vy });
+          } else {
+            // Chamfered: trim a tiny triangle off each cell's saddle
+            // corner. Cells remain geometrically disconnected; most
+            // of the empty saddle region stays empty.
+            //
+            // NW cell's SE corner trimmed by `a × a / 2`:
+            toAdd.push({ x1: vx, y1: vy - 1, x2: vx, y2: vy - a });
+            toAdd.push({ x1: vx, y1: vy - a, x2: vx - a, y2: vy });
+            toAdd.push({ x1: vx - a, y1: vy, x2: vx - 1, y2: vy });
+            // SE cell's NW corner trimmed:
+            toAdd.push({ x1: vx, y1: vy + 1, x2: vx, y2: vy + a });
+            toAdd.push({ x1: vx, y1: vy + a, x2: vx + a, y2: vy });
+            toAdd.push({ x1: vx + a, y1: vy, x2: vx + 1, y2: vy });
+          }
         } else if (ne && sw && !nw && !se) {
           toRemove.add(edgeKey(vx + 1, vy, vx, vy)); //     NE.B
           toRemove.add(edgeKey(vx, vy, vx, vy - 1)); //     NE.L
           toRemove.add(edgeKey(vx - 1, vy, vx, vy)); //     SW.T
           toRemove.add(edgeKey(vx, vy, vx, vy + 1)); //     SW.R
-          toAdd.push({ x1: vx - 1, y1: vy, x2: vx, y2: vy - 1 });
-          toAdd.push({ x1: vx + 1, y1: vy, x2: vx, y2: vy + 1 });
+          if (a === 0) {
+            toAdd.push({ x1: vx - 1, y1: vy, x2: vx, y2: vy - 1 });
+            toAdd.push({ x1: vx + 1, y1: vy, x2: vx, y2: vy + 1 });
+          } else {
+            // NE cell's SW corner trimmed:
+            toAdd.push({ x1: vx + 1, y1: vy, x2: vx + a, y2: vy });
+            toAdd.push({ x1: vx + a, y1: vy, x2: vx, y2: vy - a });
+            toAdd.push({ x1: vx, y1: vy - a, x2: vx, y2: vy - 1 });
+            // SW cell's NE corner trimmed:
+            toAdd.push({ x1: vx - 1, y1: vy, x2: vx - a, y2: vy });
+            toAdd.push({ x1: vx - a, y1: vy, x2: vx, y2: vy + a });
+            toAdd.push({ x1: vx, y1: vy + a, x2: vx, y2: vy + 1 });
+          }
         }
       }
     }
@@ -726,6 +806,119 @@ function applySaddleDiagonals(
 
 function edgeKey(x1: number, y1: number, x2: number, y2: number): string {
   return `${x1},${y1}->${x2},${y2}`;
+}
+
+/**
+ * Identify every grid corner that's a saddle for this component.
+ * Returned as a map of `"x,y"` → saddle kind.
+ */
+function findSaddles(component: CellSet): Map<string, 'backslash' | 'slash'> {
+  const saddles = new Map<string, 'backslash' | 'slash'>();
+  const checked = new Set<string>();
+  for (const key of component) {
+    const [r, c] = parseCellKey(key);
+    for (let dr = 0; dr <= 1; dr++) {
+      for (let dc = 0; dc <= 1; dc++) {
+        const vx = c + dc;
+        const vy = r + dr;
+        const vk = `${vx},${vy}`;
+        if (checked.has(vk)) continue;
+        checked.add(vk);
+        const nw = component.has(cellKey(vy - 1, vx - 1));
+        const ne = component.has(cellKey(vy - 1, vx));
+        const sw = component.has(cellKey(vy, vx - 1));
+        const se = component.has(cellKey(vy, vx));
+        if (nw && se && !ne && !sw) saddles.set(vk, 'backslash');
+        else if (ne && sw && !nw && !se) saddles.set(vk, 'slash');
+      }
+    }
+  }
+  return saddles;
+}
+
+/**
+ * Build boundary edges with per-face saddle truncation, then append
+ * one short chamfer diagonal per saddle corner of each filled cell.
+ *
+ * Each cell face is emitted as a shortened segment skipping the
+ * `notch` at either end that lies on a saddle vertex; any face with
+ * two saddle endpoints keeps only its middle portion. The chamfer
+ * diagonals travel in the correct clockwise direction for the
+ * surrounding outline:
+ *
+ * - `\` saddle: NW cell's SE corner chamfer runs SW; SE cell's NW
+ *   corner chamfer runs NE.
+ * - `/` saddle: NE cell's SW corner chamfer runs NW; SW cell's NE
+ *   corner chamfer runs SE.
+ */
+function buildChamferedBoundary(
+  component: CellSet,
+  notch: number,
+): DualEdge[] {
+  const saddles = findSaddles(component);
+  const edges: DualEdge[] = [];
+  for (const key of component) {
+    const [r, c] = parseCellKey(key);
+    if (!component.has(cellKey(r - 1, c))) {
+      emitTruncated(c, r, c + 1, r, saddles, notch, edges);
+    }
+    if (!component.has(cellKey(r, c + 1))) {
+      emitTruncated(c + 1, r, c + 1, r + 1, saddles, notch, edges);
+    }
+    if (!component.has(cellKey(r + 1, c))) {
+      emitTruncated(c + 1, r + 1, c, r + 1, saddles, notch, edges);
+    }
+    if (!component.has(cellKey(r, c - 1))) {
+      emitTruncated(c, r + 1, c, r, saddles, notch, edges);
+    }
+  }
+  for (const [vk, kind] of saddles) {
+    const [vx, vy] = vk.split(',').map(Number);
+    if (kind === 'backslash') {
+      edges.push({ x1: vx, y1: vy - notch, x2: vx - notch, y2: vy });
+      edges.push({ x1: vx, y1: vy + notch, x2: vx + notch, y2: vy });
+    } else {
+      edges.push({ x1: vx + notch, y1: vy, x2: vx, y2: vy - notch });
+      edges.push({ x1: vx - notch, y1: vy, x2: vx, y2: vy + notch });
+    }
+  }
+  return edges;
+}
+
+/**
+ * Emit a single cell face, truncated by `notch` at whichever endpoint(s)
+ * lie on a saddle. If both endpoints are saddles the middle portion is
+ * emitted; if the resulting segment has zero length it's omitted.
+ */
+function emitTruncated(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  saddles: Map<string, 'backslash' | 'slash'>,
+  notch: number,
+  edges: DualEdge[],
+): void {
+  const startSaddle = saddles.has(`${x1},${y1}`);
+  const endSaddle = saddles.has(`${x2},${y2}`);
+  if (!startSaddle && !endSaddle) {
+    edges.push({ x1, y1, x2, y2 });
+    return;
+  }
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  const ux = dx / len;
+  const uy = dy / len;
+  const sx = startSaddle ? x1 + ux * notch : x1;
+  const sy = startSaddle ? y1 + uy * notch : y1;
+  const ex = endSaddle ? x2 - ux * notch : x2;
+  const ey = endSaddle ? y2 - uy * notch : y2;
+  const dxs = ex - sx;
+  const dys = ey - sy;
+  if (dxs * dxs + dys * dys > 1e-12) {
+    edges.push({ x1: sx, y1: sy, x2: ex, y2: ey });
+  }
 }
 
 /**

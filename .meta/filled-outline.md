@@ -45,9 +45,9 @@ tested against trivial fixtures before touching QR codes at all.
 | 6  | Saddles — X pattern as single 8-vertex self-intersecting loop | ✅     |
 | 7  | Hollows — rectangular O-ring with outer CW + inner CCW loops  | ✅     |
 | 8  | Unified `trace()` — fallback with saddle-diagonal handling    | ✅     |
-| 9  | Renderer (offset + corner treatment + curves)                 | ⏳     |
-| 10 | Wire new pipeline into `toSvgOutline`, scan tests green       | ⏳     |
-| 11 | Delete `regions.ts`, `treatments.ts`, `bad2.svg`              | ⏳     |
+| 9  | Renderer (per-edge offset + sharp / rounded corners)          | ✅     |
+| 10 | Wire new pipeline into `toSvgOutline`, scan tests green       | ✅     |
+| 11 | Delete `regions.ts`, `treatments.ts`, `bad2.svg`              | ✅     |
 
 ## Data model
 
@@ -147,27 +147,26 @@ Old `regions.ts` pipeline is not yet deleted — lives until Stage 11.
 - X saddle: user said 8 points in one closed loop; working through the
   geometry surfaced three interpretations — see Open Questions. Stopped
   before guessing.
-- **Landed**: Stages 0–7 (46 tests) committed as `52c5eb4`; Stage 8
-  added on top (51 tests total).
-  - `src/svg/trace.ts`: Stage 8 `unifiedTrace` with connected
-    components, directed boundary edges (cell-on-right convention),
-    no-notch saddle diagonals, edge chaining, and collinear-vertex
-    simplification. Removed `UnsupportedShapeError` (no longer thrown
-    — every valid cell set now produces paths).
-  - `tests/trace.test.ts`: converted former negative "throws" tests
-    into positive "Stage 8 yields N paths" assertions, added a
-    Stage 8 describe block covering multi-component input, plus-shape,
-    T-shape, multi-hole, non-rectangular hole, and bent-with-saddle
-    cases.
-- User preference confirmed: keep token usage well below 100% so the
-  parallel paid-work session can continue. Pace conservatively and
-  offer natural break points.
-- **Next session pickup**: Stage 9 — the renderer. Per-edge offset
-  outward (along left-hand perpendicular of travel direction), corner
-  treatments (sharp / rounded). Expected signature:
-  `render(paths, { offset, corners, ... }): string` returning an SVG
-  `<path d="...">` fragment. Special-case for 2-vertex degenerate
-  paths (lines as capsules) and self-intersecting paths (X from
-  Stage 6 — per-edge offset handles these naturally because each
-  edge's offset is local). Dot rendering decision to be made here
-  too.
+- **Landed all 12 stages in one session — rebuild complete.**
+  - Stages 0–7 committed as `52c5eb4` (46 tests).
+  - Stage 8 committed as `8938611` (+5 tests, 51 total).
+  - Stages 9–11 landed together: Stage 9 added `src/svg/render.ts`
+    (per-edge offset, sharp/rounded corners, flat-capped 180°
+    reversals); Stage 10 swapped the `toSvgOutline` pipeline to
+    `traceUniform + render` with a 0.125-module saddle chamfer for
+    QR scannability; Stage 11 deleted `regions.ts`, `treatments.ts`,
+    and `bad2.svg`.
+  - Final tally: **177 tests across 6 files, all green** (trace 63,
+    render 11, scan 63, plus encode / png / svg suites).
+- Two semantic points worth remembering:
+  - `render`'s `offset` parameter is signed. Positive expands
+    outward (grows outer boundaries, shrinks holes); negative
+    shrinks inward. `toSvgOutline` maps `treatment.inset → -offset`.
+  - The Stage 6 X pinwheel, the Stage 4 triangle, and similar
+    creative shape outputs are only produced when the user calls
+    `trace()` directly. The QR renderer uses `traceUniform()`,
+    which skips the creative detectors and emits faithful
+    cell-border outlines so scanners see cells exactly.
+- `saddleNotch` option on `TraceOptions`: `0` (default) keeps the
+  original no-notch semantics for custom shape callers; `0.125` is
+  what QR rendering passes to preserve empty cells at saddles.
