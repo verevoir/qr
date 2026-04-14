@@ -839,7 +839,9 @@ function edgeKey(x1: number, y1: number, x2: number, y2: number): string {
  * Identify every grid corner that's a saddle for this component.
  * Returned as a map of `"x,y"` → saddle kind.
  */
-function findSaddles(component: CellSet): Map<string, 'backslash' | 'slash'> {
+export function findSaddles(
+  component: CellSet,
+): Map<string, 'backslash' | 'slash'> {
   const saddles = new Map<string, 'backslash' | 'slash'>();
   const checked = new Set<string>();
   for (const key of component) {

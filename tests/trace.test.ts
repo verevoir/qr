@@ -14,6 +14,7 @@ import {
   CLOCKWISE_8,
   cellKey,
   clockwiseNeighbours,
+  findSaddles,
   trace,
 } from '../src/svg/trace.js';
 import type { CellKey, CellSet } from '../src/svg/trace.js';
@@ -758,5 +759,163 @@ describe('trace — Stage 8 fallback', () => {
     // Stage 3 requires size ≥ 2, so single cells fall to Stage 8
     const paths = trace(cells);
     expect(paths).toEqual([[[0, 0], [1, 0], [1, 1], [0, 1]]]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Saddle semantics — invariants the creative detectors and Stage 8 share
+// ---------------------------------------------------------------------------
+
+describe('saddle invariants', () => {
+  it('a 3-cell L has no saddles in any of its four orientations', () => {
+    // The inner corner of an L has three surrounding cells present and
+    // one absent — a concave turn, not a 2-present / 2-absent saddle.
+    // Stage 4's triangle detector handles this geometrically (a
+    // 3-vertex right triangle with a diagonal hypotenuse replacing
+    // the stair-step) and never invokes the saddle code path.
+    const orientations = [
+      grid(['XX', 'X.']),
+      grid(['XX', '.X']),
+      grid(['X.', 'XX']),
+      grid(['.X', 'XX']),
+    ];
+    for (const cells of orientations) {
+      expect(findSaddles(cells).size).toBe(0);
+    }
+  });
+
+  it('a 3-cell L with diagonals renders as a 3-vertex triangle', () => {
+    // The geometric consequence of no saddles: the trace output is
+    // the Stage 4 triangle directly, three vertices, no chamfers.
+    const cells = grid(['XX', 'X.']);
+    const [path] = trace(cells, { diagonals: true });
+    expect(path).toHaveLength(3);
+  });
+
+  it('the X saddle has exactly 4 saddles — the four corners of the centre cell', () => {
+    // The canonical 3×3 X: cells at the four corners plus the centre.
+    // The centre cell's four corners are each a 2-present / 2-absent
+    // diagonal configuration. Two `\` and two `/`.
+    const cells = grid([
+      'X.X',
+      '.X.',
+      'X.X',
+    ]);
+    const saddles = findSaddles(cells);
+    expect(saddles.size).toBe(4);
+    // Exact positions: centre cell (1,1) occupies (1,1) → (2,2), so
+    // its corners are (1,1), (2,1), (2,2), (1,2).
+    expect(saddles.get('1,1')).toBe('backslash'); //  NW+SE present
+    expect(saddles.get('2,1')).toBe('slash'); //      NE+SW present
+    expect(saddles.get('2,2')).toBe('backslash'); //  NW+SE present
+    expect(saddles.get('1,2')).toBe('slash'); //      NE+SW present
+  });
+
+  it('the X saddle renders as an 8-vertex pinwheel (detector bypasses saddle code)', () => {
+    // Stage 6's detectXSaddle fires and emits the four-arms-meeting-
+    // at-centre shape directly, even though `findSaddles` finds 4
+    // saddles in the cell set. The saddle code in Stage 8 is never
+    // invoked for the canonical X.
+    const cells = grid([
+      'X.X',
+      '.X.',
+      'X.X',
+    ]);
+    const [path] = trace(cells, { diagonals: true });
+    expect(path).toHaveLength(8);
+  });
+
+  it('a solid rectangle has no saddles regardless of size', () => {
+    // Solid regions have every corner surrounded by 3 or 4 present
+    // cells (at the bounding box) or all 4 (interior). Neither
+    // configuration is a saddle.
+    for (const cells of [
+      grid(['XX', 'XX']),
+      grid(['XXX', 'XXX', 'XXX']),
+      grid(['XXXX', 'XXXX']),
+    ]) {
+      expect(findSaddles(cells).size).toBe(0);
+    }
+  });
+
+  it('a centered 45° pyramid (1+3+5+7 cells) has no saddles', () => {
+    // 4-row isoceles triangle with horizontal base and 45° sides.
+    // Every step along the diagonal sides has 3 of 4 surrounding
+    // cells present and 1 absent — a concave stair-step, not a
+    // 2+2 diagonal saddle. Scales the same way for taller pyramids.
+    const pyramid = grid([
+      '...X...',
+      '..XXX..',
+      '.XXXXX.',
+      'XXXXXXX',
+    ]);
+    expect(findSaddles(pyramid).size).toBe(0);
+  });
+
+  it('larger 45° pyramids scale the same — 1+3+5+7+9 cells, still 0 saddles', () => {
+    // 5-row version. Useful as a regression fixture when detectors
+    // get added later — e.g. a future large-triangle detector
+    // should collapse the stair-step into a clean 3-vertex outline
+    // without ever invoking the saddle code path on the way.
+    const pyramid = grid([
+      '....X....',
+      '...XXX...',
+      '..XXXXX..',
+      '.XXXXXXX.',
+      'XXXXXXXXX',
+    ]);
+    expect(findSaddles(pyramid).size).toBe(0);
+  });
+
+  // 4-cell T exercises two concave inner corners instead of the L's
+  // single corner — where the stem meets the bar on both sides. All
+  // four orientations covered in one loop.
+  it('a 4-cell T has no saddles in any of its four orientations', () => {
+    const orientations = [
+      // stem-down T (bar on top)
+      grid([
+        'XXX',
+        '.X.',
+      ]),
+      // stem-up T (bar on bottom, inverted T)
+      grid([
+        '.X.',
+        'XXX',
+      ]),
+      // stem-right (bar on left)
+      grid([
+        'X.',
+        'XX',
+        'X.',
+      ]),
+      // stem-left (bar on right)
+      grid([
+        '.X',
+        'XX',
+        '.X',
+      ]),
+    ];
+    for (const cells of orientations) {
+      expect(findSaddles(cells).size).toBe(0);
+    }
+  });
+
+  // The I-beam adds two more concave corners on top of the T — all
+  // four stem-meets-cap corners exercised simultaneously.
+  it('a 7-cell I-beam has no saddles in either orientation', () => {
+    // Horizontal I-beam
+    const horizontal = grid([
+      'XXX',
+      '.X.',
+      'XXX',
+    ]);
+    expect(findSaddles(horizontal).size).toBe(0);
+    // Vertical I-beam (rotated 90°)
+    const vertical = grid([
+      'X.X',
+      'XXX',
+      'X.X',
+    ]);
+    expect(findSaddles(vertical).size).toBe(0);
   });
 });
