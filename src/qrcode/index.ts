@@ -175,11 +175,28 @@ export function buildString(text: string, options: QRCodeOptions): string {
   });
   if (format === 'utf8') return buildUtf8(qr, options.margin ?? 1);
   if (format === 'terminal') return buildTerminal(qr, options.margin ?? 1);
+  // Colour and margin are now handled by SvgOptions — no more
+  // post-emit string substitution. Width (pixel dimensions) still
+  // applies as an attribute rewrite since SvgOptions doesn't carry
+  // a pixel-size concept, only the module-unit viewBox.
   let svg = toSvg(qr, {
     style: options.style,
     cornerStyle: options.cornerStyle,
+    color: options.color
+      ? {
+          dark: options.color.dark,
+          light: options.color.light,
+          // node-qrcode treats `color.light` as the background for
+          // raster outputs; mirror that by doubling light → background
+          // when a light colour is explicitly set, unless it's
+          // transparent (in which case no background rect).
+          background:
+            options.color.light && options.color.light !== 'transparent'
+              ? options.color.light
+              : undefined,
+        }
+      : undefined,
   });
-  svg = applyColours(svg, options.color);
   svg = applyMargin(svg, options.margin);
   svg = applyWidth(svg, options.width);
   return svg;
@@ -237,30 +254,6 @@ function buildTerminal(qr: QrMatrix, margin: number): string {
 // ---------------------------------------------------------------------------
 // Option-to-SVG translators
 // ---------------------------------------------------------------------------
-
-/**
- * Substitute the default black fill and transparent background with
- * the user's colours. String-replace — brittle for complex styles;
- * to be revisited once `render` has a fill override option.
- */
-function applyColours(
-  svg: string,
-  color: QRCodeOptions['color'] | undefined,
-): string {
-  if (!color) return svg;
-  let out = svg;
-  if (color.dark && color.dark !== '#000000' && color.dark !== '#000') {
-    out = out.replaceAll('fill="#000"', `fill="${color.dark}"`);
-    out = out.replaceAll('fill="#000000"', `fill="${color.dark}"`);
-  }
-  if (color.light && color.light !== 'transparent') {
-    out = out.replace(
-      /(<svg[^>]*>)/,
-      `$1<rect width="100%" height="100%" fill="${color.light}"/>`,
-    );
-  }
-  return out;
-}
 
 /**
  * Pad the viewBox by `margin` modules on every side. `node-qrcode`
