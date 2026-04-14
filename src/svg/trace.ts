@@ -1047,12 +1047,20 @@ function buildChamferedBoundary(component: CellSet, notch: number): DualEdge[] {
   }
   for (const [vk, kind] of saddles) {
     const [vx, vy] = vk.split(',').map(Number);
+    // Bridges, not per-cell corner chamfers. A `\` saddle's top
+    // bridge connects the NW cell's truncated right face to the
+    // SE cell's truncated top face via a single 45° diagonal, and
+    // the bottom bridge mirrors it between SE's left and NW's
+    // bottom. The two diagonally-touching cells merge into one
+    // outline instead of two corner-trimmed shapes touching at
+    // a point — giving continuous zig-zag edges across saddle
+    // chains instead of visible gaps between cells.
     if (kind === 'backslash') {
-      edges.push({ x1: vx, y1: vy - notch, x2: vx - notch, y2: vy });
-      edges.push({ x1: vx, y1: vy + notch, x2: vx + notch, y2: vy });
+      edges.push({ x1: vx, y1: vy - notch, x2: vx + notch, y2: vy });
+      edges.push({ x1: vx, y1: vy + notch, x2: vx - notch, y2: vy });
     } else {
-      edges.push({ x1: vx + notch, y1: vy, x2: vx, y2: vy - notch });
-      edges.push({ x1: vx - notch, y1: vy, x2: vx, y2: vy + notch });
+      edges.push({ x1: vx - notch, y1: vy, x2: vx, y2: vy - notch });
+      edges.push({ x1: vx + notch, y1: vy, x2: vx, y2: vy + notch });
     }
   }
   return edges;
