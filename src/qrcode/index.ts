@@ -14,21 +14,25 @@
  *
  * ## API shape
  *
- * The underlying v2 engine is fully synchronous, so this shim's
- * `toString` returns a string directly rather than wrapping it in a
- * Promise. Existing `await QRCode.toString(...)` call sites still
- * work unchanged — `await` on a non-Promise resolves to the value.
+ * Every entry point preserves `node-qrcode`'s type contract so
+ * existing call sites keep their inferred types. `toString` returns
+ * `Promise<string>` when no callback is given (even though the work
+ * is synchronous internally) so code like
+ * `const p: Promise<string> = QRCode.toString(...)` or
+ * `QRCode.toString(text).then(...)` ports across unchanged.
  *
- * The node-qrcode-style `(err, result)` callback form is supported
- * everywhere node-qrcode supports it. Callbacks are invoked
- * synchronously from `toString` / `create` since the work is sync.
+ * The node-qrcode-style `(err, result)` callback form is accepted
+ * everywhere it is in node-qrcode; the return type narrows to
+ * `void` via function overloads when a callback is passed.
  *
  * ## What's covered
  *
- * - ✅ `create` — returns a QR matrix description
- * - ✅ `toString(text, opts)` and `toString(text, opts, cb)`,
- *      with `format: 'svg' | 'utf8' | 'terminal'` (aliased as
- *      `type` for source compatibility). `'svg'` is the default.
+ * - ✅ `create` — returns a QR matrix description (sync; same as
+ *      node-qrcode's `create`).
+ * - ✅ `toString(text, opts)` → `Promise<string>`,
+ *      `toString(text, opts, cb)` → `void`. Matches node-qrcode.
+ *      `format: 'svg' | 'utf8' | 'terminal'` (aliased as `type` for
+ *      source compatibility). `'svg'` is the default.
  * - ✅ `errorCorrectionLevel`, `margin`, `width`, `color.dark`,
  *      `color.light` options.
  * - ⚠️  `version` / `maskPattern` not honoured — node-qrcode ignores
@@ -97,12 +101,15 @@ export function create(
 }
 
 // ---------------------------------------------------------------------------
-// toString (sync)
+// toString
 // ---------------------------------------------------------------------------
 
 /* eslint-disable no-redeclare */
-export function toString(text: string): string;
-export function toString(text: string, options: QRCodeOptions): string;
+export function toString(text: string): Promise<string>;
+export function toString(
+  text: string,
+  options: QRCodeOptions,
+): Promise<string>;
 export function toString(text: string, cb: Callback<string>): void;
 export function toString(
   text: string,
@@ -113,23 +120,29 @@ export function toString(
   text: string,
   a?: QRCodeOptions | Callback<string>,
   b?: Callback<string>,
-): string | void {
+): Promise<string> | void {
   const { options, cb } = normaliseArgs(a, b);
+  // The underlying work is synchronous; wrap in Promise.resolve /
+  // Promise.reject so the return type stays `Promise<string>` and
+  // node-qrcode's type contract ports over unchanged. Callers who
+  // want the raw sync result can use `create()` + the v2 `toSvg` /
+  // `toSvgOutline` directly.
+  let result: string;
   try {
-    const result = buildString(text, options);
-    if (cb) {
-      cb(null, result);
-      return;
-    }
-    return result;
+    result = buildString(text, options);
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
     if (cb) {
       cb(error);
       return;
     }
-    throw error;
+    return Promise.reject(error);
   }
+  if (cb) {
+    cb(null, result);
+    return;
+  }
+  return Promise.resolve(result);
 }
 /* eslint-enable no-redeclare */
 
