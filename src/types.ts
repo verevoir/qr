@@ -14,7 +14,8 @@ export type SvgStyle =
   | 'outline'
   | 'outline-round'
   | 'outline-diagonal'
-  | 'outline-round-diagonal';
+  | 'outline-round-diagonal'
+  | 'outline-narrow';
 
 export type CornerStyle = 'square' | 'rounded' | 'round';
 

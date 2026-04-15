@@ -103,21 +103,24 @@ export interface TraceOptions {
 // ---------------------------------------------------------------------------
 
 /**
- * 8-connected neighbour offsets as `[dRow, dCol]`. Diagonals first
- * (clockwise from NE), then cardinals (clockwise from E). This
- * ordering biases detection and traversal toward diagonal
- * relationships before rectilinear ones — important for shapes
- * like stepped stripes where the diagonal structure is the
- * defining feature and would otherwise get classified as a
- * stair-stepped rectilinear shape.
+ * 8-connected neighbour offsets as `[dRow, dCol]`. Interleaved
+ * clockwise from NE, with each diagonal coming before the axis that
+ * sits on its *trailing* side — so a walker probing neighbours in
+ * this order picks up `NE` before `E`, `SE` before `S`, `SW` before
+ * `W`, `NW` before `N`. This biases traversal toward diagonal
+ * continuations over their rectilinear constituents, so shapes
+ * whose defining feature is diagonal (stepped stripes, X saddles,
+ * corner-linked clusters) don't get pre-empted by an axis-first
+ * match that would classify them as stair-stepped rectilinear
+ * geometry instead.
  */
 export const CLOCKWISE_8: readonly Cell[] = [
   [-1, 1], //  NE
   [1, 1], //   SE
-  [1, -1], //  SW
-  [-1, -1], // NW
   [0, 1], //   E
+  [1, -1], //  SW
   [1, 0], //   S
+  [-1, -1], // NW
   [0, -1], //  W
   [-1, 0], //  N
 ];
@@ -807,6 +810,21 @@ function unifiedTrace(
 }
 
 /**
+ * The output of `traceComponents`: multi-cell components become paths
+ * (closed clockwise vertex loops), and single-cell components are
+ * separated out as dots — each a grid-space `[col, row]` cell origin.
+ *
+ * Splitting dots out at the trace layer lets renderers treat them as
+ * a distinct data class (e.g. `renderNarrow` emits them as diamonds)
+ * while keeping the path stream free of trivial 4-vertex squares.
+ */
+export interface Trace {
+  readonly paths: readonly Path[];
+  /** One entry per isolated single-cell component, as `[col, row]`. */
+  readonly dots: readonly Cell[];
+}
+
+/**
  * Trace each connected component of `cells` separately through the full
  * `trace()` pipeline, so the Stage 3–7 creative detectors get their
  * chance on each component's shape rather than being defeated by
@@ -818,19 +836,30 @@ function unifiedTrace(
  * 5-cell X components as pinwheels, straight runs as degenerate
  * capsule lines, and larger components fall through to `unifiedTrace`
  * for a faithful cell-border outline.
+ *
+ * Single-cell components are not routed through `trace()` at all —
+ * they're emitted as entries in `dots` so consumers can render them
+ * however they like (diamond, circle, full square).
  */
 export function traceComponents(
   cells: CellSet,
   options: TraceOptions = {},
-): readonly Path[] {
+): Trace {
   const diagonals = options.diagonals ?? false;
   const paths: Path[] = [];
+  const dots: Cell[] = [];
   for (const component of findComponents(cells, diagonals)) {
+    if (component.size === 1) {
+      const [key] = component;
+      const [r, c] = parseCellKey(key);
+      dots.push([c, r]);
+      continue;
+    }
     for (const path of trace(component, options)) {
       paths.push(path);
     }
   }
-  return paths;
+  return { paths, dots };
 }
 
 /** Partition `cells` into connected components under the chosen rule. */

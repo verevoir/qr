@@ -9,8 +9,85 @@
  * independently of the trace layer.
  */
 import { describe, it, expect } from 'vitest';
-import { render } from '../src/svg/render.js';
+import { render, pathOffset } from '../src/svg/render.js';
 import type { Path } from '../src/svg/trace.js';
+
+// for the purpose of these tests we have a 5 x 5 space, we always start at 2,2
+//    0 1 2 3 4
+//  0
+//  1
+//  2
+//  3
+//  4
+
+describe('pathOffset', () => {
+  it.each([
+    [3, 1],
+    [4, 0],
+  ])(
+    'a path moving up and to the right returns a diagonal offset up and to the left',
+    (x: number, y: number) => {
+      expect(pathOffset([2, 2], [x, y], 0.5, 0.35)).toEqual([-0.35, -0.35]);
+    },
+  );
+  it.each([
+    [3, 3],
+    [4, 4],
+  ])(
+    'a path moving down and to the right returns a diagonal offset up and to the right',
+    (x: number, y: number) => {
+      expect(pathOffset([2, 2], [x, y], 0.5, 0.35)).toEqual([0.35, -0.35]);
+    },
+  );
+  it.each([
+    [1, 3],
+    [0, 4],
+  ])(
+    'a path moving down and to the left returns a diagonal offset down and to the right',
+    (x: number, y: number) => {
+      expect(pathOffset([2, 2], [x, y], 0.5, 0.35)).toEqual([0.35, 0.35]);
+    },
+  );
+  it.each([
+    [1, 1],
+    [0, 0],
+  ])(
+    'a path moving up and to the left returns a diagonal offset down and to the left',
+    (x: number, y: number) => {
+      expect(pathOffset([2, 2], [x, y], 0.5, 0.35)).toEqual([-0.35, 0.35]);
+    },
+  );
+  it.each([
+    [2, 1],
+    [2, 0],
+  ])(
+    'a path moving up returns an offset to the left',
+    (x: number, y: number) => {
+      expect(pathOffset([2, 2], [x, y], 0.5, 0.35)).toEqual([-0.5, 0]);
+    },
+  );
+  it.each([
+    [3, 2],
+    [4, 2],
+  ])('a path moving right returns an offset up', (x: number, y: number) => {
+    expect(pathOffset([2, 2], [x, y], 0.5, 0.35)).toEqual([0, -0.5]);
+  });
+  it.each([
+    [2, 3],
+    [2, 4],
+  ])(
+    'a path moving down returns an offset to the right',
+    (x: number, y: number) => {
+      expect(pathOffset([2, 2], [x, y], 0.5, 0.35)).toEqual([0.5, 0]);
+    },
+  );
+  it.each([
+    [1, 2],
+    [0, 2],
+  ])('a path moving left returns an offset down', (x: number, y: number) => {
+    expect(pathOffset([2, 2], [x, y], 0.5, 0.35)).toEqual([0, 0.5]);
+  });
+});
 
 describe('render', () => {
   it('empty paths array produces an empty string', () => {

@@ -2,8 +2,8 @@ import type { QrMatrix, CornerStyle, SvgColor } from '../types.js';
 import { renderCorners } from './corners.js';
 import { applyColours } from './shared.js';
 import { traceComponents, cellKey } from './trace.js';
-import type { CellKey, CellSet } from './trace.js';
-import { render } from './render.js';
+import type { CellKey, CellSet, Path } from './trace.js';
+import { render, renderNarrow } from './render.js';
 
 // ---------------------------------------------------------------------------
 // Public treatment API
@@ -144,10 +144,22 @@ export function toSvgOutline(
   // components (L triangles, X pinwheels, capsule lines) still use
   // the creative detectors unchanged; the notch only affects
   // Stage 8 fallback geometry.
-  const paths = traceComponents(cells, {
+  const { paths: componentPaths, dots } = traceComponents(cells, {
     diagonals,
     saddleNotch: diagonals ? 0.5 : 0,
   });
+  // `render()` expects every filled region as a closed path, so
+  // rebuild each single-cell dot into its 4-vertex unit square.
+  // `renderNarrow` handles dots natively as diamonds.
+  const paths: Path[] = [...componentPaths];
+  for (const [c, r] of dots) {
+    paths.push([
+      [c, r],
+      [c + 1, r],
+      [c + 1, r + 1],
+      [c, r + 1],
+    ]);
+  }
   // Third iteration: line-like paths at 0.125 (one-eighth cell).
   // NB: this thins the Stage 3 capsule lines and the Stage 6
   // X-pinwheel arms; it does NOT thin the Stage 8 region edges
@@ -173,6 +185,50 @@ export function toSvgOutline(
   // still punch holes correctly in that case via crossing counts.
   const dataContent = pathData
     ? `<path d="${pathData}" fill="#000" fill-rule="evenodd"/>`
+    : '';
+
+  const viewSize = qr.size + 2;
+  const color = options.color ?? {};
+  const coloured = applyColours(
+    `<g id="finder">${finderContent}</g><g id="data">${dataContent}</g>`,
+    color,
+  );
+  const bg = color.background
+    ? `<rect width="${viewSize}" height="${viewSize}" fill="${color.background}"/>`
+    : '';
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewSize} ${viewSize}">` +
+    bg +
+    coloured +
+    `</svg>`
+  );
+}
+
+/**
+ * Narrow-outline renderer — calls `renderNarrow` directly on the
+ * `Trace` so each component becomes a thin outline band (outer CW +
+ * inner CCW) and each single-cell dot becomes a diamond. No dot
+ * rebuild; no per-edge miter maths. Scaffolding for driving the
+ * new algorithm through slinqi; we'll clean up the options surface
+ * once we know what we want.
+ */
+export function toSvgOutlineNarrow(
+  qr: QrMatrix,
+  options: OutlineOptions = {},
+): string {
+  const cornerStyle = options.cornerStyle ?? 'rounded';
+
+  const finderOnlyQr: QrMatrix = { ...qr, alignmentCoordinates: [] };
+  const finderContent = renderCorners(finderOnlyQr, cornerStyle);
+
+  const cells = buildDataCellSet(qr);
+  const trace = traceComponents(cells, { diagonals: false, saddleNotch: 0 });
+  const pathData = renderNarrow(trace, {
+    offset: 0.1,
+    translate: [1, 1],
+  });
+  const dataContent = pathData
+    ? `<path d="${pathData}" fill="#000" fill-rule="nonzero"/>`
     : '';
 
   const viewSize = qr.size + 2;

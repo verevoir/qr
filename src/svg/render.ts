@@ -37,7 +37,7 @@
  * filled-with-holes.
  */
 
-import type { Path, Vertex } from './trace.js';
+import type { Path, Trace, Vertex } from './trace.js';
 
 export interface RenderOptions {
   /**
@@ -78,6 +78,129 @@ export interface RenderOptions {
    * overshoots. Default `0.25`.
    */
   readonly cornerRadius?: number;
+}
+
+/**
+ * Thin-outline renderer. For each multi-vertex path, emits two closed
+ * subpaths:
+ *
+ * - an **outer** ring, CW, with every edge shifted outward (left-hand
+ *   perpendicular) by `offset / 2`
+ * - an **inner** ring, the same path shifted inward by `offset / 2`,
+ *   emitted in reverse so its winding is CCW
+ *
+ * With SVG's default `nonzero` fill rule, CW + CCW cancel inside the
+ * inner ring, leaving only the thin band between the two as filled —
+ * the QR outline appears as a stroke rather than a solid shape.
+ *
+ * Dots (single-cell components) render as diamonds whose horizontal
+ * and vertical half-diagonals equal `offset / 2`.
+ *
+ * Unlike `render`, this function does not compute miter joins — each
+ * edge contributes its own pair of offset endpoints, so axis-aligned
+ * corners get a tiny extra vertex pair rather than a mitered corner.
+ * Cheap, and acceptable for the narrow treatment.
+ */
+export function renderNarrow(
+  trace: Trace,
+  options: RenderOptions = {},
+): string {
+  const halfOffset = (options.offset ?? 1) / 2;
+  const diagonalOffset = halfOffset / Math.SQRT2;
+  const [tx, ty] = options.translate ?? [0, 0];
+
+  let d = '';
+  for (const path of trace.paths) {
+    d += renderNarrowPath(path, halfOffset, diagonalOffset, tx, ty);
+  }
+  for (const [c, r] of trace.dots) {
+    d += renderDot(c + 0.5, r + 0.5, halfOffset, tx, ty);
+  }
+  return d;
+}
+
+function renderNarrowPath(
+  path: Path,
+  halfOffset: number,
+  diagonalOffset: number,
+  tx: number,
+  ty: number,
+): string {
+  const n = path.length;
+  if (n < 2) return '';
+
+  const outerPoints: Vertex[] = [];
+  const innerPoints: Vertex[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = path[i];
+    const b = path[(i + 1) % n];
+    const off = pathOffset(a, b, halfOffset, diagonalOffset);
+    outerPoints.push(addOffset(a, off));
+    outerPoints.push(addOffset(b, off));
+    innerPoints.push(subtractOffset(a, off));
+    innerPoints.push(subtractOffset(b, off));
+  }
+
+  return polyline(outerPoints, tx, ty) + polyline(innerPoints.reverse(), tx, ty);
+}
+
+function polyline(points: readonly Vertex[], tx: number, ty: number): string {
+  if (points.length === 0) return '';
+  let d = `M${fmt(points[0][0] + tx)},${fmt(points[0][1] + ty)}`;
+  for (let i = 1; i < points.length; i++) {
+    d += `L${fmt(points[i][0] + tx)},${fmt(points[i][1] + ty)}`;
+  }
+  return d + 'Z';
+}
+
+function renderDot(
+  cx: number,
+  cy: number,
+  halfOffset: number,
+  tx: number,
+  ty: number,
+): string {
+  const x = cx + tx;
+  const y = cy + ty;
+  return (
+    `M${fmt(x)},${fmt(y - halfOffset)}` +
+    `L${fmt(x + halfOffset)},${fmt(y)}` +
+    `L${fmt(x)},${fmt(y + halfOffset)}` +
+    `L${fmt(x - halfOffset)},${fmt(y)}Z`
+  );
+}
+
+function addOffset(vertex: Vertex, offset: Vertex): Vertex {
+  return [vertex[0] + offset[0], vertex[1] + offset[1]];
+}
+
+function subtractOffset(vertex: Vertex, offset: Vertex): Vertex {
+  return [vertex[0] - offset[0], vertex[1] - offset[1]];
+}
+
+/**
+ * Outward (left-hand) perpendicular offset for a single edge, snapped
+ * to the 8-compass direction the edge is travelling in. Axis-aligned
+ * edges use `offset`; 45° diagonals use `diagonalOffset` (typically
+ * `offset / √2`, so the resulting capsule has the same perpendicular
+ * half-width regardless of edge direction).
+ *
+ * Left-hand perpendicular in SVG screen coords (y-down) of a direction
+ * `(dx, dy)` is `(dy, -dx)` — for a clockwise path this points outward.
+ * Collapses to `[Math.sign(dy) * s, -Math.sign(dx) * s]`.
+ */
+export function pathOffset(
+  lastVertex: Vertex,
+  vertex: Vertex,
+  offset: number,
+  diagonalOffset: number,
+): Vertex {
+  const dx = vertex[0] - lastVertex[0];
+  const dy = vertex[1] - lastVertex[1];
+  if (dx === 0 && dy === 0) throw new Error("Don't be silly");
+  const scale = dx === 0 || dy === 0 ? offset : diagonalOffset;
+  // `+ 0` collapses `-0` to `0` for stable test equality and cleaner SVG output.
+  return [Math.sign(dy) * scale + 0, -Math.sign(dx) * scale + 0];
 }
 
 /**

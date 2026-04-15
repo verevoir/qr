@@ -17,6 +17,7 @@ import { renderTubemap, renderMetro } from './tubemap.js';
 import { renderScribble, renderMetroScribble } from './scribble.js';
 import {
   toSvgOutline,
+  toSvgOutlineNarrow,
   SHARP,
   ROUNDED,
   SHARP_DIAGONAL,
@@ -42,6 +43,8 @@ export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
       treatment: ROUNDED_DIAGONAL,
       color,
     });
+  if (style === 'outline-narrow')
+    return toSvgOutlineNarrow(qr, { cornerStyle, color });
 
   // Corner patterns (finder + alignment)
   let content = renderCorners(qr, cornerStyle);

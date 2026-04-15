@@ -34,14 +34,14 @@ function grid(rows: readonly string[]): CellSet {
 // ---------------------------------------------------------------------------
 
 describe('clockwiseNeighbours', () => {
-  it('8-connected order: diagonals first (CW from NE), then cardinals (CW from E)', () => {
+  it('8-connected order: clockwise from NE, each diagonal before its trailing axis', () => {
     expect(CLOCKWISE_8).toEqual([
       [-1, 1], //  NE
       [1, 1], //   SE
-      [1, -1], //  SW
-      [-1, -1], // NW
       [0, 1], //   E
+      [1, -1], //  SW
       [1, 0], //   S
+      [-1, -1], // NW
       [0, -1], //  W
       [-1, 0], //  N
     ]);
@@ -78,15 +78,15 @@ describe('clockwiseNeighbours', () => {
     expect(clockwiseNeighbours([1, 1], cells)).toEqual([]);
   });
 
-  it('8-connected: full ring visits diagonals (NE, SE, SW, NW) then cardinals (E, S, W, N)', () => {
+  it('8-connected: full ring interleaves diagonals with their trailing axis (NE, SE, E, SW, S, NW, W, N)', () => {
     const cells = grid(['XXX', 'XXX', 'XXX']);
     expect(clockwiseNeighbours([1, 1], cells, { diagonals: true })).toEqual([
       [0, 2], // NE
       [2, 2], // SE
-      [2, 0], // SW
-      [0, 0], // NW
       [1, 2], // E
+      [2, 0], // SW
       [2, 1], // S
+      [0, 0], // NW
       [1, 0], // W
       [0, 1], // N
     ]);
