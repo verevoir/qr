@@ -20,8 +20,22 @@ const N: Vertex = { x: 0, y: -1 };
 
 const Neighbors8: Vertex[] = [NE, SE, E, SW, S, NW, W, N];
 
-type Path = Vertex[];
-type Trace = {
+/**
+ * A traced shape: its outer CW outline, any enclosed multi-cell hole
+ * outlines (walked CW, rendered as cut-outs via fill-rule), and any
+ * single-cell holes or 1-cell islands inside holes (rendered as dots).
+ *
+ * Multi-cell islands inside holes aren't supported yet — if one shows
+ * up the simplest extension is to push it back to `Trace.dots` /
+ * `Trace.paths` via a recursive `trace()` call on the inverted mask.
+ */
+export type Path = {
+  vertices: Vertex[];
+  holeVertices: Vertex[][];
+  dots: Vertex[];
+};
+
+export type Trace = {
   dots: Vertex[];
   paths: Path[];
 };
@@ -64,113 +78,6 @@ export function* vertexFilter(
 }
 
 /**
- * Mark every cell of the component reachable from any `path` vertex as
- * visited, via 4-connected BFS through filled cells. This guarantees
- * interior cells the walker skipped over (e.g. the centre of a 5×5 +
- * if the walker were to stop short of it) are marked, so they won't be
- * picked up as separate dots on the next scanline iteration.
- *
- * Correctness: every cell in the connected component is reachable from
- * any other cell in it by a 4-connected path through filled cells (by
- * definition of "4-connected component"). Path vertices are cells in
- * the component, so seeding BFS with them reaches every component cell.
- *
- * Hole detection is deferred — the caller's plan is to flood-fill the
- * background from outside the bounding box in a second pass; anything
- * unreachable there is enclosed and recurses into the same tracer.
- */
-function floodFill(path: Path, cells: Uint8Array[], grid: VisitedGrid): void {
-  const size = grid.size;
-  const queue: Vertex[] = path.slice();
-  while (queue.length > 0) {
-    const { x, y } = queue.pop() as Vertex;
-    const axisNeighbours: Vertex[] = [
-      { x: x + 1, y },
-      { x: x - 1, y },
-      { x, y: y + 1 },
-      { x, y: y - 1 },
-    ];
-    for (const next of axisNeighbours) {
-      if (next.x < 0 || next.x >= size || next.y < 0 || next.y >= size)
-        continue;
-      if (cells[next.y][next.x] !== 1) continue;
-      if (grid.visited(next.x, next.y)) continue;
-      grid.visit(next.x, next.y);
-      queue.push(next);
-    }
-  }
-}
-
-/**
- * Depth-first walk from `cell`, following `Neighbors8` in fixed order
- * and recording a backtrack vertex each time a recursion unwinds. This
- * gives junction cells (like the centre of an X) one vertex per arm
- * visit — the "pinwheel" pattern — while straight runs produce a flat
- * sequence that `vertexFilter` later collapses to just the inflection
- * points.
- *
- * Returns `true` when this branch of the walk reached `start` via its
- * `Neighbors8` iteration — the caller then unwinds the whole recursion
- * immediately, closing the loop in `Neighbors8` (i.e. CW, diagonal-
- * preferring) order. This is the "diagonals always win" rule in
- * action: for a 3×3 `+`, from the west-arm cell the NE neighbour
- * *is* the start cell, so we close before ever considering the E
- * neighbour (which is the centre).
- */
-function walk(
-  cell: Vertex,
-  start: Vertex,
-  cells: Uint8Array[],
-  grid: VisitedGrid,
-  size: number,
-  path: Vertex[],
-): boolean {
-  for (const neighbor of Neighbors8) {
-    const combined = neighborVertex(cell, neighbor, size);
-    if (!combined) continue;
-    if (cells[combined.y][combined.x] !== 1) continue;
-    if (combined.x === start.x && combined.y === start.y) return true;
-    if (grid.visited(combined.x, combined.y)) continue;
-
-    grid.visit(combined.x, combined.y);
-    path.push(combined);
-    const closed = walk(combined, start, cells, grid, size, path);
-    if (closed) return true; //   close path early; caller re-adds start once at top level
-    path.push(cell); //   re-record on return — this is the junction's "next arm" checkpoint
-  }
-  return false;
-}
-
-export function trace(cells: Uint8Array[]): Trace {
-  const size = cells.length;
-  const grid = new VisitedGrid(size);
-  const result: Trace = {
-    dots: [],
-    paths: [],
-  };
-
-  for (const start of grid.unvisited()) {
-    grid.visit(start.x, start.y);
-    if (cells[start.y][start.x] === 0) continue;
-
-    const path: Vertex[] = [start];
-    walk(start, start, cells, grid, size, path);
-
-    if (path.length === 1) {
-      result.dots.push(path[0]);
-    } else {
-      path.push({ x: start.x, y: start.y }); // close the loop
-      floodFill(path, cells, grid);
-      result.paths.push(path);
-    }
-  }
-  return {
-    dots: result.dots,
-    paths: result.paths.map((p) => Array.from(vertexFilter(p))),
-  };
-}
-
-/**
  * Sort vertices by y coordinate first, then x. Used to establish
  * a scanline-friendly order for flood fill — processing top-to-
  * bottom, left-to-right.
@@ -182,12 +89,6 @@ export function sortVertices(vertices: Vertex[]): Vertex[] {
 /**
  * Tracks which cells in a grid have been visited. Rows are
  * allocated lazily so a sparse grid doesn't waste memory.
- *
- * Exposes:
- * - `visit(x, y)` — mark a cell as visited
- * - `visited(x, y)` — check if a cell has been visited
- * - `unvisited()` — generator yielding all unvisited `{x, y}`
- *   coordinates in scanline order (top-to-bottom, left-to-right)
  */
 export class VisitedGrid {
   private rows: Uint8Array[] = [];
@@ -234,4 +135,240 @@ function neighborVertex(
     combined.y < size
     ? combined
     : undefined;
+}
+
+/**
+ * Depth-first walk from `cell`, following `Neighbors8` in fixed order
+ * and recording a backtrack vertex each time a recursion unwinds. This
+ * gives junction cells (like the centre of an X) one vertex per arm
+ * visit — the "pinwheel" pattern — while straight runs produce a flat
+ * sequence that `vertexFilter` later collapses to just the inflection
+ * points.
+ *
+ * Returns `true` when this branch of the walk reached `start` via its
+ * `Neighbors8` iteration — the caller then unwinds the whole recursion
+ * immediately, closing the loop in `Neighbors8` (i.e. CW, diagonal-
+ * preferring) order. This is the "diagonals always win" rule in
+ * action: for a 3×3 `+`, from the west-arm cell the NE neighbour
+ * *is* the start cell, so we close before ever considering the E
+ * neighbour (which is the centre).
+ *
+ * `isTarget` decides whether a neighbour is a valid walk cell. For
+ * the outer trace it's `cells[y][x] === 1`; for hole tracing it's
+ * `mask[y][x] === 1 && cells[y][x] === 0` — same walker, flipped
+ * polarity.
+ */
+function walk(
+  cell: Vertex,
+  start: Vertex,
+  isTarget: (x: number, y: number) => boolean,
+  visited: VisitedGrid,
+  size: number,
+  path: Vertex[],
+): boolean {
+  for (const neighbor of Neighbors8) {
+    const combined = neighborVertex(cell, neighbor, size);
+    if (!combined) continue;
+    if (!isTarget(combined.x, combined.y)) continue;
+    if (combined.x === start.x && combined.y === start.y) return true;
+    if (visited.visited(combined.x, combined.y)) continue;
+
+    visited.visit(combined.x, combined.y);
+    path.push(combined);
+    const closed = walk(combined, start, isTarget, visited, size, path);
+    if (closed) return true; //   close path early; caller re-adds start once at top level
+    path.push(cell); //   re-record on return — this is the junction's "next arm" checkpoint
+  }
+  return false;
+}
+
+/**
+ * 4-connected BFS from `seeds` through cells where `isMember(x, y)` is
+ * true. Returns the full list of member cells reachable from any seed,
+ * using its own local visited set so it can traverse cells the walker
+ * has already marked in the outer grid. Caller is responsible for
+ * marking the returned cells visited if they want to prevent re-walk.
+ *
+ * Used for the outer-trace component expansion: the walker visits a
+ * subset of the component, and this flood picks up any cells the
+ * walker skipped (e.g. the centre of a 5×5 +).
+ */
+function floodRegion(
+  seeds: readonly Vertex[],
+  isMember: (x: number, y: number) => boolean,
+  size: number,
+): Vertex[] {
+  const seen = new Set<string>();
+  const region: Vertex[] = [];
+  const queue: Vertex[] = [];
+  const push = (v: Vertex): void => {
+    const k = `${v.x},${v.y}`;
+    if (seen.has(k)) return;
+    if (v.x < 0 || v.x >= size || v.y < 0 || v.y >= size) return;
+    if (!isMember(v.x, v.y)) return;
+    seen.add(k);
+    region.push(v);
+    queue.push(v);
+  };
+  for (const seed of seeds) push(seed);
+  while (queue.length > 0) {
+    const { x, y } = queue.pop() as Vertex;
+    push({ x: x + 1, y });
+    push({ x: x - 1, y });
+    push({ x, y: y + 1 });
+    push({ x, y: y - 1 });
+  }
+  return region;
+}
+
+/**
+ * For a single connected 1-component, compute its "fill mask" — the
+ * set of cells that lie inside its outer boundary (both the component
+ * cells themselves AND any enclosed 0-cells, which are holes).
+ *
+ * Approach: flood-fill the *background* (0-cells outside the
+ * component) from the grid's outer boundary through 4-connected
+ * non-component cells. Anything the flood doesn't reach is either a
+ * component cell (definitionally inside) or an enclosed 0-cell — a
+ * hole. Mask = component ∪ holes.
+ *
+ * The returned mask is suitable as input to `traceHoles`: the hole
+ * walker only considers cells where `mask === 1 && cells === 0`, so
+ * holes are exactly the walkable region.
+ */
+function buildMask(
+  componentCells: readonly Vertex[],
+  size: number,
+): Uint8Array[] {
+  const inComp = Array.from({ length: size }, () => new Uint8Array(size));
+  for (const v of componentCells) inComp[v.y][v.x] = 1;
+
+  const reached = Array.from({ length: size }, () => new Uint8Array(size));
+  const queue: Vertex[] = [];
+  const enqueue = (x: number, y: number): void => {
+    if (x < 0 || x >= size || y < 0 || y >= size) return;
+    if (inComp[y][x]) return;
+    if (reached[y][x]) return;
+    reached[y][x] = 1;
+    queue.push({ x, y });
+  };
+  for (let x = 0; x < size; x++) {
+    enqueue(x, 0);
+    enqueue(x, size - 1);
+  }
+  for (let y = 0; y < size; y++) {
+    enqueue(0, y);
+    enqueue(size - 1, y);
+  }
+  while (queue.length > 0) {
+    const { x, y } = queue.pop() as Vertex;
+    enqueue(x + 1, y);
+    enqueue(x - 1, y);
+    enqueue(x, y + 1);
+    enqueue(x, y - 1);
+  }
+
+  const mask = Array.from({ length: size }, () => new Uint8Array(size));
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (inComp[y][x] || !reached[y][x]) mask[y][x] = 1;
+    }
+  }
+  return mask;
+}
+
+/**
+ * Trace the 0-cell regions enclosed by a component's `mask`.  Same
+ * walker, same rules — just flipped polarity on `isTarget` so the
+ * walker steps through empty cells instead of filled ones.  Returns
+ * hole outlines (multi-cell) and single-cell hole positions (dots).
+ *
+ * Note: this is the "not a modal function" half of the two-function
+ * split — an entry point that happens to share its walker with
+ * `trace()` via a predicate rather than a mode flag.
+ */
+function traceHoles(
+  cells: Uint8Array[],
+  mask: Uint8Array[],
+  size: number,
+): { dots: Vertex[]; outlines: Vertex[][] } {
+  const visited = new VisitedGrid(size);
+  const dots: Vertex[] = [];
+  const outlines: Vertex[][] = [];
+  const isTarget = (x: number, y: number): boolean =>
+    mask[y][x] === 1 && cells[y][x] === 0;
+
+  for (const start of visited.unvisited()) {
+    visited.visit(start.x, start.y);
+    if (!isTarget(start.x, start.y)) continue;
+
+    const path: Vertex[] = [start];
+    walk(start, start, isTarget, visited, size, path);
+
+    if (path.length === 1) {
+      dots.push(path[0]);
+      continue;
+    }
+    path.push({ x: start.x, y: start.y });
+
+    // Same early-close caveat as the outer trace: the walker can
+    // close before every hole cell has been visited.  Flood the
+    // full 4-connected hole region and mark everything in it, so
+    // stragglers don't reappear as spurious single-cell dots.
+    const holeCells = floodRegion([start], isTarget, size);
+    for (const v of holeCells) visited.visit(v.x, v.y);
+
+    outlines.push(Array.from(vertexFilter(path)));
+  }
+
+  return { dots, outlines };
+}
+
+export function trace(cells: Uint8Array[]): Trace {
+  const size = cells.length;
+  const grid = new VisitedGrid(size);
+  const isTarget = (x: number, y: number): boolean => cells[y][x] === 1;
+  const dots: Vertex[] = [];
+  const paths: Path[] = [];
+
+  for (const start of grid.unvisited()) {
+    grid.visit(start.x, start.y);
+    if (!isTarget(start.x, start.y)) continue;
+
+    const rawPath: Vertex[] = [start];
+    walk(start, start, isTarget, grid, size, rawPath);
+
+    if (rawPath.length === 1) {
+      dots.push(rawPath[0]);
+      continue;
+    }
+    rawPath.push({ x: start.x, y: start.y });
+
+    // Expand the outer walk into the full 4-connected component, so
+    // interior cells the walker skipped (e.g. a + centre) are known
+    // before we build the mask.
+    const component = floodRegion([start], isTarget, size);
+
+    // Build the fill-mask and trace any enclosed hole regions.
+    const mask = buildMask(component, size);
+    const holes = traceHoles(cells, mask, size);
+
+    // Mark hole cells visited too, so the outer scanline loop doesn't
+    // revisit them. (Islands — 1-cells inside holes — are currently
+    // also marked; they'd be picked up as separate top-level dots if
+    // we ever want to surface them.)
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (mask[y][x]) grid.visit(x, y);
+      }
+    }
+
+    paths.push({
+      vertices: Array.from(vertexFilter(rawPath)),
+      holeVertices: holes.outlines,
+      dots: holes.dots,
+    });
+  }
+
+  return { dots, paths };
 }

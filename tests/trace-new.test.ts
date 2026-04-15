@@ -4,7 +4,7 @@ import {
   VisitedGrid,
   vertexFilter,
 } from '../src/svg/trace-new';
-import type { Vertex } from '../src/svg/trace-new';
+import type { Vertex, Path } from '../src/svg/trace-new';
 import { describe, expect, it } from 'vitest';
 
 function toUInt(array: number[][]): Uint8Array[] {
@@ -18,6 +18,13 @@ function toUInt(array: number[][]): Uint8Array[] {
 
 /** Shorthand so tests read naturally: `v(2, 1)` instead of `{ x: 2, y: 1 }`. */
 const v = (x: number, y: number): Vertex => ({ x, y });
+
+/** Compose a `Path` with empty holes by default. */
+const p = (
+  vertices: Vertex[],
+  holeVertices: Vertex[][] = [],
+  dots: Vertex[] = [],
+): Path => ({ vertices, holeVertices, dots });
 
 describe('pin wheels', () => {
   it('finds a dot', () => {
@@ -60,7 +67,7 @@ describe('pin wheels', () => {
     const response = trace(testData);
 
     expect(response.dots.length).toBe(0);
-    expect(response.paths).toEqual([[v(2, 1), v(3, 2), v(2, 1)]]);
+    expect(response.paths).toEqual([p([v(2, 1), v(3, 2), v(2, 1)])]);
   });
   it('finds two lines', () => {
     const testData = toUInt([
@@ -75,8 +82,8 @@ describe('pin wheels', () => {
 
     expect(response.dots.length).toBe(0);
     expect(response.paths).toEqual([
-      [v(2, 1), v(3, 2), v(2, 1)],
-      [v(1, 3), v(0, 4), v(1, 3)],
+      p([v(2, 1), v(3, 2), v(2, 1)]),
+      p([v(1, 3), v(0, 4), v(1, 3)]),
     ]);
   });
 });
@@ -216,7 +223,7 @@ describe('+ pattern', () => {
 
     expect(response.dots.length).toBe(0);
     expect(response.paths).toEqual([
-      [v(1, 0), v(2, 1), v(1, 2), v(0, 1), v(1, 0)],
+      p([v(1, 0), v(2, 1), v(1, 2), v(0, 1), v(1, 0)]),
     ]);
   });
 
@@ -233,7 +240,7 @@ describe('+ pattern', () => {
 
     expect(response.dots.length).toBe(0);
     expect(response.paths).toEqual([
-      [
+      p([
         v(2, 0),
         v(2, 1),
         v(3, 2),
@@ -250,7 +257,7 @@ describe('+ pattern', () => {
         v(3, 2),
         v(2, 1),
         v(2, 0),
-      ],
+      ]),
     ]);
   });
 });
@@ -266,7 +273,9 @@ describe('I pattern', () => {
     const response = trace(testData);
 
     expect(response.dots.length).toBe(0);
-    expect(response.paths).toEqual([[v(0, 0), v(1, 1), v(2, 0), v(0, 0)]]);
+    expect(response.paths).toEqual([
+      p([v(0, 0), v(1, 1), v(2, 0), v(0, 0)]),
+    ]);
   });
 
   it('traces a 5x5 I', () => {
@@ -282,7 +291,7 @@ describe('I pattern', () => {
 
     expect(response.dots.length).toBe(0);
     expect(response.paths).toEqual([
-      [
+      p([
         v(0, 0),
         v(1, 0),
         v(2, 1),
@@ -300,7 +309,7 @@ describe('I pattern', () => {
         v(2, 1),
         v(1, 0),
         v(0, 0),
-      ],
+      ]),
     ]);
   });
 });
@@ -317,7 +326,15 @@ describe('H pattern', () => {
 
     expect(response.dots.length).toBe(0);
     expect(response.paths).toEqual([
-      [v(0, 0), v(1, 1), v(2, 0), v(2, 2), v(2, 0), v(0, 2), v(0, 0)],
+      p([
+        v(0, 0),
+        v(1, 1),
+        v(2, 0),
+        v(2, 2),
+        v(2, 0),
+        v(0, 2),
+        v(0, 0),
+      ]),
     ]);
   });
 
@@ -334,7 +351,7 @@ describe('H pattern', () => {
 
     expect(response.dots.length).toBe(0);
     expect(response.paths).toEqual([
-      [
+      p([
         v(0, 0),
         v(0, 1),
         v(1, 2),
@@ -352,7 +369,7 @@ describe('H pattern', () => {
         v(1, 2),
         v(0, 1),
         v(0, 0),
-      ],
+      ]),
     ]);
   });
 });
@@ -369,7 +386,7 @@ describe('x pattern', () => {
 
     expect(response.dots.length).toBe(0);
     expect(response.paths).toEqual([
-      [
+      p([
         v(0, 0),
         v(1, 1),
         v(2, 0),
@@ -379,7 +396,7 @@ describe('x pattern', () => {
         v(0, 2),
         v(1, 1),
         v(0, 0),
-      ],
+      ]),
     ]);
   });
 
@@ -396,7 +413,7 @@ describe('x pattern', () => {
 
     expect(response.dots.length).toBe(0);
     expect(response.paths).toEqual([
-      [
+      p([
         v(0, 0),
         v(2, 2),
         v(4, 0),
@@ -406,7 +423,7 @@ describe('x pattern', () => {
         v(0, 4),
         v(2, 2),
         v(0, 0),
-      ],
+      ]),
     ]);
   });
 
@@ -423,7 +440,7 @@ describe('x pattern', () => {
 
     expect(response.dots.length).toBe(0);
     expect(response.paths).toEqual([
-      [
+      p([
         v(0, 0),
         v(0, 1),
         v(1, 2),
@@ -445,8 +462,134 @@ describe('x pattern', () => {
         v(1, 2),
         v(0, 1),
         v(0, 0),
-      ],
+      ]),
     ]);
+  });
+});
+
+describe('holes', () => {
+  it('3x3 ring surfaces a single-cell hole as a dot', () => {
+    const testData = toUInt([
+      [1, 1, 1],
+      [1, 0, 1],
+      [1, 1, 1],
+    ]);
+
+    const response = trace(testData);
+
+    expect(response.dots).toEqual([]);
+    expect(response.paths).toEqual([
+      p(
+        [
+          v(0, 0),
+          v(1, 0),
+          v(2, 1),
+          v(1, 2),
+          v(2, 2),
+          v(1, 2),
+          v(0, 1),
+          v(0, 2),
+          v(0, 0),
+        ],
+        [],
+        [v(1, 1)],
+      ),
+    ]);
+  });
+
+  it('5x5 ring has a 3x3 multi-cell hole', () => {
+    const testData = toUInt([
+      [1, 1, 1, 1, 1],
+      [1, 0, 0, 0, 1],
+      [1, 0, 0, 0, 1],
+      [1, 0, 0, 0, 1],
+      [1, 1, 1, 1, 1],
+    ]);
+
+    const response = trace(testData);
+
+    expect(response.dots).toEqual([]);
+    expect(response.paths).toEqual([
+      p(
+        [
+          v(0, 0),
+          v(3, 0),
+          v(4, 1),
+          v(4, 3),
+          v(3, 4),
+          v(4, 4),
+          v(1, 4),
+          v(0, 3),
+          v(0, 4),
+          v(0, 0),
+        ],
+        [
+          [
+            v(1, 1),
+            v(2, 2),
+            v(3, 1),
+            v(3, 2),
+            v(2, 3),
+            v(3, 3),
+            v(2, 3),
+            v(1, 2),
+            v(2, 1),
+            v(1, 1),
+          ],
+        ],
+      ),
+    ]);
+  });
+
+  it('5x5 solid with single-cell hole surfaces as a hole-dot', () => {
+    const testData = toUInt([
+      [1, 1, 1, 1, 1],
+      [1, 1, 1, 1, 1],
+      [1, 1, 0, 1, 1],
+      [1, 1, 1, 1, 1],
+      [1, 1, 1, 1, 1],
+    ]);
+
+    const response = trace(testData);
+
+    expect(response.dots).toEqual([]);
+    expect(response.paths).toHaveLength(1);
+    const path = response.paths[0];
+    expect(path.holeVertices).toEqual([]);
+    expect(path.dots).toEqual([v(2, 2)]);
+  });
+
+  it('figure-8 (stacked rings) has two single-cell holes', () => {
+    const testData = toUInt([
+      [1, 1, 1],
+      [1, 0, 1],
+      [1, 1, 1],
+      [1, 0, 1],
+      [1, 1, 1],
+    ]);
+
+    const response = trace(testData);
+
+    expect(response.dots).toEqual([]);
+    expect(response.paths).toHaveLength(1);
+    const path = response.paths[0];
+    expect(path.holeVertices).toEqual([]);
+    expect(path.dots).toEqual([v(1, 1), v(1, 3)]);
+  });
+
+  it('shape with no holes has empty holeVertices and dots', () => {
+    const testData = toUInt([
+      [1, 1, 0],
+      [1, 1, 0],
+      [0, 0, 0],
+    ]);
+
+    const response = trace(testData);
+
+    expect(response.paths).toHaveLength(1);
+    const path = response.paths[0];
+    expect(path.holeVertices).toEqual([]);
+    expect(path.dots).toEqual([]);
   });
 });
 
