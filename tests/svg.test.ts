@@ -42,10 +42,10 @@ describe('toSvg', () => {
       expect(svg).toMatch(/<rect width="\d+" height="\d+" fill="#eeeeee"\/>/);
     });
 
-    it('outline-debug style respects color options', () => {
+    it('network style respects color options', () => {
       const qr = getQr();
       const svg = toSvg(qr, {
-        style: 'outline-debug',
+        style: 'network',
         color: { dark: '#123456', light: '#abcdef' },
       });
       expect(svg).toContain('fill="#123456"');
@@ -63,11 +63,14 @@ describe('toSvg', () => {
   const styles: SvgStyle[] = [
     'square',
     'dots',
+    'diamonds',
     'horizontal',
     'vertical',
     'diagonal',
-    'grid',
-    'outline-debug',
+    'network',
+    'circuit',
+    'metro',
+    'scribble',
   ];
 
   for (const style of styles) {
@@ -100,7 +103,7 @@ describe('toSvg', () => {
   });
 
   describe('corner styles', () => {
-    const cornerStyles: CornerStyle[] = ['square', 'rounded', 'round'];
+    const cornerStyles: CornerStyle[] = ['square', 'rounded'];
 
     for (const cs of cornerStyles) {
       it(`renders ${cs} corners`, () => {
@@ -116,10 +119,10 @@ describe('toSvg', () => {
       expect(svg).toContain('<rect');
     });
 
-    it('round corners use circle elements', () => {
+    it('rounded corners use rx on rects', () => {
       const qr = getQr();
-      const svg = toSvg(qr, { cornerStyle: 'round' });
-      expect(svg).toContain('<circle');
+      const svg = toSvg(qr, { cornerStyle: 'rounded' });
+      expect(svg).toContain('rx=');
     });
   });
 
@@ -127,38 +130,22 @@ describe('toSvg', () => {
     it('renders both dark and light dots', () => {
       const qr = getQr();
       const svg = toSvg(qr, { style: 'dots' });
-      expect(svg).toContain('stroke="#000"');
-      expect(svg).toContain('stroke="#fff"');
-    });
-
-    it('always wraps in layer groups', () => {
-      const qr = getQr();
-      const svg = toSvg(qr, { style: 'dots' });
-      expect(svg).toContain('id="dark"');
-      expect(svg).toContain('id="light"');
+      expect(svg).toContain('fill="#000"');
+      expect(svg).toContain('fill="#fff"');
     });
   });
 
   describe('line width', () => {
-    it('normal uses 0.9 stroke width', () => {
+    it('normal uses full-size dots', () => {
       const qr = getQr();
-      const svg = toSvg(qr, { style: 'horizontal', lineWidth: 'normal' });
-      expect(svg).toContain('stroke-width="0.9"');
+      const svg = toSvg(qr, { style: 'square', lineWidth: 'normal' });
+      expect(svg).toContain('width="1"');
     });
 
-    it('thin uses 0.65 stroke width', () => {
+    it('thin uses smaller dots', () => {
       const qr = getQr();
-      const svg = toSvg(qr, { style: 'horizontal', lineWidth: 'thin' });
-      expect(svg).toContain('stroke-width="0.65"');
-    });
-  });
-
-  describe('grid style', () => {
-    it('produces filled paths for connected regions', () => {
-      const qr = getQr();
-      const svg = toSvg(qr, { style: 'grid' });
-      expect(svg).toContain('<path d="M');
-      expect(svg).toContain('fill="#000"');
+      const svg = toSvg(qr, { style: 'square', lineWidth: 'thin' });
+      expect(svg).toContain('width="0.5"');
     });
   });
 
@@ -172,28 +159,12 @@ describe('toSvg', () => {
     });
   });
 
-  describe('outline-debug style', () => {
-    it('produces named finder and data groups', () => {
+  describe('network style', () => {
+    it('contains stroked paths', () => {
       const qr = getQr();
-      const svg = toSvg(qr, { style: 'outline-debug' });
-      expect(svg).toContain('id="finder"');
-      expect(svg).toContain('id="data"');
-    });
-
-    it('data group contains stroked paths', () => {
-      const qr = getQr();
-      const svg = toSvg(qr, { style: 'outline-debug' });
+      const svg = toSvg(qr, { style: 'network' });
       expect(svg).toContain('<path d="M');
       expect(svg).toContain('stroke=');
-    });
-
-    it('respects cornerStyle option', () => {
-      const qr = getQr();
-      const svg = toSvg(qr, {
-        style: 'outline-debug',
-        cornerStyle: 'round',
-      });
-      expect(svg).toContain('<circle');
     });
   });
 });

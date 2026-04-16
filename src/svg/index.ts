@@ -7,15 +7,12 @@ import type {
 } from '../types.js';
 import { wrapSvg } from './shared.js';
 import { renderCorners } from './corners.js';
-import { renderSquare } from './square.js';
-import { renderDots } from './dots.js';
 import { renderHorizontal } from './horizontal.js';
 import { renderVertical } from './vertical.js';
 import { renderDiagonal } from './diagonal.js';
-import { renderGrid } from './grid.js';
-import { renderTubemap, renderMetro } from './tubemap.js';
-import { renderScribble, renderMetroScribble } from './scribble.js';
-import { toSvgOutlineDebug } from './outline.js';
+import { renderCells, renderOutline, renderCircuit } from './outline.js';
+import { renderTubemap } from './tubemap.js';
+import { renderScribble } from './scribble.js';
 
 export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
   const style: SvgStyle = options?.style ?? 'square';
@@ -23,18 +20,21 @@ export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
   const lineWidth: LineWidth = options?.lineWidth ?? 'normal';
   const color = options?.color;
 
-  // Outline pipeline — new trace-new walker.
-  if (style === 'outline-debug')
-    return toSvgOutlineDebug(qr, { cornerStyle, color });
-
   // Corner patterns (finder + alignment)
   let content = renderCorners(qr, cornerStyle);
 
   // Data modules in the chosen style.
-  // Timing patterns are included in the data matrix and rendered in-style.
+  const dotSize = lineWidth === 'thin' ? 0.5 : 1;
+
   switch (style) {
+    case 'square':
+      content += renderCells(qr, 'square', dotSize);
+      break;
     case 'dots':
-      content += renderDots(qr, 'thin');
+      content += renderCells(qr, 'circle', dotSize, true);
+      break;
+    case 'diamonds':
+      content += renderCells(qr, 'diamond', dotSize);
       break;
     case 'horizontal':
       content += renderHorizontal(qr, lineWidth);
@@ -45,24 +45,20 @@ export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
     case 'diagonal':
       content += renderDiagonal(qr, lineWidth);
       break;
-    case 'grid':
-      content += renderGrid(qr);
+    case 'network':
+      content += renderOutline(qr, lineWidth === 'thin' ? 0.25 : 0.5);
       break;
-    case 'lines':
-      content += renderTubemap(qr, lineWidth);
+    case 'circuit':
+      content += renderCircuit(qr, lineWidth === 'thin' ? 0.25 : 0.5);
       break;
     case 'metro':
-      content += renderMetro(qr, lineWidth);
+      content += renderTubemap(qr, lineWidth);
       break;
     case 'scribble':
       content += renderScribble(qr, lineWidth);
       break;
-    case 'scribble-alt':
-      content += renderMetroScribble(qr, lineWidth);
-      break;
-    case 'square':
     default:
-      content += renderSquare(qr);
+      content += renderCells(qr, 'square', dotSize);
       break;
   }
 

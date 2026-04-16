@@ -14,7 +14,6 @@
 
 export { encode } from './encode.js';
 export { toSvg } from './svg/index.js';
-export type { OutlineOptions } from './svg/outline.js';
 export type {
   ErrorLevel,
   SvgStyle,

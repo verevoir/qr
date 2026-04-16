@@ -3,17 +3,16 @@ export type ErrorLevel = 'L' | 'M' | 'Q' | 'H';
 export type SvgStyle =
   | 'square'
   | 'dots'
+  | 'diamonds'
   | 'horizontal'
   | 'vertical'
   | 'diagonal'
-  | 'grid'
-  | 'lines'
+  | 'network'
+  | 'circuit'
   | 'metro'
-  | 'scribble'
-  | 'scribble-alt'
-  | 'outline-debug';
+  | 'scribble';
 
-export type CornerStyle = 'square' | 'rounded' | 'round';
+export type CornerStyle = 'square' | 'rounded';
 
 export type LineWidth = 'normal' | 'thin';
 

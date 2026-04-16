@@ -5,11 +5,9 @@
  */
 import { trace } from '../src/svg/trace';
 import { offsetSubpath } from '../src/svg/outline';
-import type { Vertex } from '../src/svg/trace';
 import { describe, it, expect } from 'vitest';
 
 const toUInt = (a: number[][]) => a.map((r) => Uint8Array.from(r));
-const v = (x: number, y: number): Vertex => ({ x, y });
 
 /** Count M (moveto) commands in an SVG path string. */
 function countSubpaths(d: string): number {

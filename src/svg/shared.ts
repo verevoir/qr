@@ -39,12 +39,12 @@ function fillMaskArea(
   }
 }
 
-export function strokeWidth(lw: LineWidth): number {
-  return lw === 'thin' ? 0.65 : 0.9;
+export function strokeWidth(lw: LineWidth, thin = 0.325): number {
+  return lw === 'thin' ? thin : 0.9;
 }
 
-export function dotWidth(lw: LineWidth): number {
-  return lw === 'thin' ? 0.65 : 0.9;
+export function dotWidth(lw: LineWidth, thin = 0.325): number {
+  return lw === 'thin' ? thin : 0.9;
 }
 
 export interface WrapOptions {

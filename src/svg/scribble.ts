@@ -299,8 +299,8 @@ function renderWithConfig(
 ): string {
   const matrix = duplicateMatrix(qr.matrix);
   const mask = fixedFeatureMask(qr);
-  const sw = strokeWidth(lineWidth);
-  const dw = dotWidth(lineWidth);
+  const sw = strokeWidth(lineWidth, 0.5);
+  const dw = dotWidth(lineWidth, 0.5);
   const size = qr.size;
 
   const components = findComponents(matrix, mask, size);

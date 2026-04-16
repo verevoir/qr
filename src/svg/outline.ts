@@ -1,100 +1,20 @@
-import type { QrMatrix, CornerStyle, SvgColor } from '../types.js';
-import { renderCorners } from './corners.js';
-import { applyColours } from './shared.js';
+import type { QrMatrix } from '../types.js';
 import { trace } from './trace.js';
 import type { Trace, Vertex } from './trace.js';
 
 // ---------------------------------------------------------------------------
-// Public API
+// Public API — each renderer is a self-contained function that produces
+// SVG content (data modules only). Finder patterns and SVG wrapping are
+// handled by `toSvg` in index.ts, same as every other style.
 // ---------------------------------------------------------------------------
-
-export interface OutlineOptions {
-  /**
-   * Visual style of the finder patterns (the three large corner squares).
-   * Defaults to `'rounded'`.
-   */
-  cornerStyle?: CornerStyle;
-  /**
-   * Colour controls. See `SvgColor` — applied via the root `color`
-   * attribute and `--qr-light` custom property.
-   */
-  color?: SvgColor;
-}
-
-/**
- * Outline renderer using the per-cell DFS walker.
- *
- * Renders each traced path as a filled offset polygon (miter joins on
- * outside corners, averaged joins on inside corners, square caps at
- * 180° reversals). Dots render as diamonds. Alignment patterns are
- * overlaid as clean concentric squares.
- *
- * Produces an SVG with two named groups:
- * - `<g id="finder">` — the three finder patterns
- * - `<g id="data">` — data modules + alignment overlays
- */
-export function toSvgOutlineNarrow(
-  qr: QrMatrix,
-  options: OutlineOptions = {},
-): string {
-  const cornerStyle = options.cornerStyle ?? 'rounded';
-
-  const finderOnlyQr: QrMatrix = { ...qr, alignmentCoordinates: [] };
-  const finderContent = renderCorners(finderOnlyQr, cornerStyle);
-
-  const grid = buildDataGrid(qr);
-  const traced = trace(grid);
-  const pathData = renderTrace(traced, 1, 1);
-
-  let alignContent = '';
-  for (const [ar, ac] of qr.alignmentCoordinates) {
-    const x = ac - 2 + 1;
-    const y = ar - 2 + 1;
-    alignContent +=
-      `<rect x="${x}" y="${y}" width="5" height="5" fill="#000"/>` +
-      `<rect x="${x + 1}" y="${y + 1}" width="3" height="3" fill="#fff"/>` +
-      `<rect x="${x + 2}" y="${y + 2}" width="1" height="1" fill="#000"/>`;
-  }
-
-  const dataContent = pathData
-    ? `<path d="${pathData}" fill="#000" fill-rule="nonzero"/>`
-    : '';
-
-  const viewSize = qr.size + 2;
-  const color = options.color ?? {};
-  const coloured = applyColours(
-    `<g id="finder">${finderContent}</g><g id="data">${dataContent}${alignContent}</g>`,
-    color,
-  );
-  const bg = color.background
-    ? `<rect width="${viewSize}" height="${viewSize}" fill="${color.background}"/>`
-    : '';
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewSize} ${viewSize}">` +
-    bg +
-    coloured +
-    `</svg>`
-  );
-}
 
 /**
  * Debug renderer — shows the raw walker paths as thin stroked lines
- * and dots as small circles. No offset maths, no fill-rule gymnastics.
- * Just "what did the walker produce?" rendered visually.
+ * and dots as small circles. Paths in black, hole outlines in red.
  *
- * Paths: thin black stroked polylines (stroke-width 0.25).
- * Holes: thin red stroked polylines.
- * Dots: small black filled circles (r=0.125).
- * Hole-dots: small red filled circles.
+ * Returns SVG content (not a complete `<svg>` element).
  */
-export function toSvgOutlineDebug(
-  qr: QrMatrix,
-  options: OutlineOptions = {},
-): string {
-  const cornerStyle = options.cornerStyle ?? 'rounded';
-  const finderOnlyQr: QrMatrix = { ...qr, alignmentCoordinates: [] };
-  const finderContent = renderCorners(finderOnlyQr, cornerStyle);
-
+export function renderOutlineDebug(qr: QrMatrix): string {
   const grid = buildDataGrid(qr);
   const traced = trace(grid);
   const tx = 1;
@@ -102,43 +22,193 @@ export function toSvgOutlineDebug(
   const sw = 0.25;
   const r = sw / 2;
 
-  let dataContent = '';
+  let content = '';
   for (const path of traced.paths) {
-    dataContent += debugPolyline(path.vertices, tx, ty, '#000', sw);
+    content += polyline(path.vertices, tx, ty, '#000', sw);
     for (const hole of path.holeVertices) {
-      dataContent += debugPolyline(hole, tx, ty, '#c00', sw);
+      content += polyline(hole, tx, ty, '#c00', sw);
     }
     for (const dot of path.dots) {
-      dataContent += `<circle cx="${fmt(dot.x + 0.5 + tx)}" cy="${fmt(dot.y + 0.5 + ty)}" r="${r}" fill="#c00"/>`;
+      content += `<circle cx="${fmt(dot.x + 0.5 + tx)}" cy="${fmt(dot.y + 0.5 + ty)}" r="${r}" fill="#c00"/>`;
     }
   }
   for (const dot of traced.dots) {
-    dataContent += `<circle cx="${fmt(dot.x + 0.5 + tx)}" cy="${fmt(dot.y + 0.5 + ty)}" r="${r}" fill="#000"/>`;
+    content += `<circle cx="${fmt(dot.x + 0.5 + tx)}" cy="${fmt(dot.y + 0.5 + ty)}" r="${r}" fill="#000"/>`;
+  }
+  return content;
+}
+
+/**
+ * Filled outline renderer — draws each traced path as a thick stroked
+ * line (stroke-width 1 = full cell width) with round joins and caps.
+ * The browser handles all the corner/cap geometry natively — no manual
+ * offset maths, no miter spikes, no crossover loops.
+ *
+ * For fabrication/printing: the SVG stroke IS the filled shape.
+ * Illustrator can expand strokes to outlines for laser/CNC paths.
+ *
+ * Returns SVG content (not a complete `<svg>` element).
+ */
+export function renderOutline(qr: QrMatrix, lineWidth = 1): string {
+  const grid = buildDataGrid(qr);
+  const traced = trace(grid);
+  const tx = 1;
+  const ty = 1;
+  const dotHalf = lineWidth >= 0.5 ? 0.6 : 0.5; // 1.2-unit diamond when thick
+
+  let content = '';
+  for (const path of traced.paths) {
+    content += polyline(path.vertices, tx, ty, '#000', lineWidth);
+    // Diamond dot at tips (dead-end reversals where prev == next)
+    // and at the path's start/close vertex.
+    const verts = path.vertices;
+    const n = verts.length;
+    const seen = new Set<string>();
+    const addDiamond = (v: Vertex) => {
+      const k = `${v.x},${v.y}`;
+      if (seen.has(k)) return;
+      seen.add(k);
+      content += cellShape('diamond', v.x + 0.5 + tx, v.y + 0.5 + ty, dotHalf, '#000');
+    };
+    // Start/close point
+    if (n > 0) addDiamond(verts[0]);
+    // Tips (reversals)
+    for (let i = 0; i < n; i++) {
+      const prev = verts[(i - 1 + n) % n];
+      const next = verts[(i + 1) % n];
+      if (prev.x === next.x && prev.y === next.y) addDiamond(verts[i]);
+    }
+  }
+  for (const dot of traced.dots) {
+    content += cellShape('diamond', dot.x + 0.5 + tx, dot.y + 0.5 + ty, dotHalf, '#000');
   }
 
-  const viewSize = qr.size + 2;
-  const color = options.color ?? {};
-  const coloured = applyColours(
-    `<g id="finder">${finderContent}</g><g id="data">${dataContent}</g>`,
-    color,
-  );
-  const bg = color.background
-    ? `<rect width="${viewSize}" height="${viewSize}" fill="${color.background}"/>`
-    : `<rect width="${viewSize}" height="${viewSize}" fill="#fff"/>`;
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewSize} ${viewSize}">` +
-    bg +
-    coloured +
-    `</svg>`
-  );
+  return content + alignmentOverlay(qr);
+}
+
+/**
+ * Circuit renderer — like network but with circular dots at tips and
+ * rounder corners. Same trace, same stroke approach, different
+ * personality.
+ */
+export function renderCircuit(qr: QrMatrix, lineWidth = 0.5): string {
+  const grid = buildDataGrid(qr);
+  const traced = trace(grid);
+  const tx = 1;
+  const ty = 1;
+  const dotRadius = lineWidth >= 0.5 ? 0.6 : 0.5; // 1.2-unit circles when thick
+
+  let content = '';
+  for (const path of traced.paths) {
+    content += polyline(path.vertices, tx, ty, '#000', lineWidth);
+    // Circle at tips and start
+    const verts = path.vertices;
+    const n = verts.length;
+    const seen = new Set<string>();
+    const addCircle = (v: Vertex) => {
+      const k = `${v.x},${v.y}`;
+      if (seen.has(k)) return;
+      seen.add(k);
+      content += `<circle cx="${fmt(v.x + 0.5 + tx)}" cy="${fmt(v.y + 0.5 + ty)}" r="${fmt(dotRadius)}" fill="#000"/>`;
+    };
+    if (n > 0) addCircle(verts[0]);
+    for (let i = 0; i < n; i++) {
+      const prev = verts[(i - 1 + n) % n];
+      const next = verts[(i + 1) % n];
+      if (prev.x === next.x && prev.y === next.y) addCircle(verts[i]);
+    }
+  }
+  for (const dot of traced.dots) {
+    content += `<circle cx="${fmt(dot.x + 0.5 + tx)}" cy="${fmt(dot.y + 0.5 + ty)}" r="${fmt(dotRadius)}" fill="#000"/>`;
+  }
+
+  return content + alignmentOverlay(qr);
+}
+
+function alignmentOverlay(qr: QrMatrix): string {
+  let content = '';
+  // Overlay clean alignment marks
+  for (const [ar, ac] of qr.alignmentCoordinates) {
+    const x = ac - 2 + 1;
+    const y = ar - 2 + 1;
+    content +=
+      `<rect x="${x}" y="${y}" width="5" height="5" fill="#000"/>` +
+      `<rect x="${x + 1}" y="${y + 1}" width="3" height="3" fill="#fff"/>` +
+      `<rect x="${x + 2}" y="${y + 2}" width="1" height="1" fill="#000"/>`;
+  }
+  return content;
+}
+
+/**
+ * Cell-based renderer — every dark cell becomes a dot of the specified
+ * shape and size. Replaces the old renderSquare/renderDots with a
+ * single parameterised function.
+ *
+ * When `renderLight` is true, light cells also render (in the light
+ * colour) so the QR can overlay an image with both layers visible.
+ */
+export function renderCells(
+  qr: QrMatrix,
+  shape: 'square' | 'circle' | 'diamond',
+  dotSize: number,
+  renderLight = false,
+): string {
+  const grid = buildDataGrid(qr);
+  const size = qr.size;
+  const tx = 1;
+  const ty = 1;
+  const half = dotSize / 2;
+  let content = '';
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const cell = grid[y][x];
+      if (cell === 2) continue; // excluded (finder/alignment)
+      const dark = cell === 1;
+      if (!dark && !renderLight) continue;
+      const cx = x + 0.5 + tx;
+      const cy = y + 0.5 + ty;
+      const fill = dark ? '#000' : '#fff';
+      content += cellShape(shape, cx, cy, half, fill);
+    }
+  }
+  return content;
+}
+
+function cellShape(
+  shape: 'square' | 'circle' | 'diamond',
+  cx: number,
+  cy: number,
+  half: number,
+  fill: string,
+): string {
+  switch (shape) {
+    case 'square':
+      return `<rect x="${fmt(cx - half)}" y="${fmt(cy - half)}" width="${fmt(half * 2)}" height="${fmt(half * 2)}" fill="${fill}"/>`;
+    case 'circle':
+      return `<circle cx="${fmt(cx)}" cy="${fmt(cy)}" r="${fmt(half)}" fill="${fill}"/>`;
+    case 'diamond':
+      return (
+        `<path d="M${fmt(cx)},${fmt(cy - half)}` +
+        `L${fmt(cx + half)},${fmt(cy)}` +
+        `L${fmt(cx)},${fmt(cy + half)}` +
+        `L${fmt(cx - half)},${fmt(cy)}Z" fill="${fill}"/>`
+      );
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Internal helpers
+// Data grid
 // ---------------------------------------------------------------------------
 
+/**
+ * Values: 0 = light data cell, 1 = dark data cell, 2 = excluded
+ * (finder/alignment region — rendered separately by renderCorners).
+ * The distinction lets renderCells skip excluded cells when drawing
+ * light dots, so white dots don't overlay finder/alignment patterns.
+ */
 function buildDataGrid(qr: QrMatrix): Uint8Array[] {
-  const { size, matrix, finderCoordinates } = qr;
+  const { size, matrix, finderCoordinates, alignmentCoordinates } = qr;
   const excluded = new Set<string>();
   for (const [fr, fc] of finderCoordinates) {
     for (let r = fr; r < Math.min(fr + 7, size); r++) {
@@ -147,18 +217,35 @@ function buildDataGrid(qr: QrMatrix): Uint8Array[] {
       }
     }
   }
+  for (const [ar, ac] of alignmentCoordinates) {
+    for (let r = ar - 2; r <= ar + 2; r++) {
+      for (let c = ac - 2; c <= ac + 2; c++) {
+        if (r >= 0 && r < size && c >= 0 && c < size) {
+          excluded.add(`${r},${c}`);
+        }
+      }
+    }
+  }
   const grid: Uint8Array[] = [];
   for (let r = 0; r < size; r++) {
     const row = new Uint8Array(size);
     for (let c = 0; c < size; c++) {
-      if (matrix[r][c] === 1 && !excluded.has(`${r},${c}`)) row[c] = 1;
+      if (excluded.has(`${r},${c}`)) {
+        row[c] = 2;
+      } else if (matrix[r][c] === 1) {
+        row[c] = 1;
+      }
     }
     grid.push(row);
   }
   return grid;
 }
 
-function renderTrace(traced: Trace, tx: number, ty: number): string {
+// ---------------------------------------------------------------------------
+// Offset renderer internals
+// ---------------------------------------------------------------------------
+
+function renderTraceOffset(traced: Trace, tx: number, ty: number): string {
   const halfWidth = 0.5;
   let d = '';
 
@@ -174,7 +261,9 @@ function renderTrace(traced: Trace, tx: number, ty: number): string {
   for (const dot of traced.dots) {
     d += diamondSubpath(dot.x + 0.5, dot.y + 0.5, halfWidth, tx, ty);
   }
-  return d;
+  return d
+    ? `<path d="${d}" fill="#000" fill-rule="nonzero"/>`
+    : '';
 }
 
 export function offsetSubpath(
@@ -244,6 +333,10 @@ export function offsetSubpath(
   return s + 'Z';
 }
 
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
 function diamondSubpath(
   cx: number,
   cy: number,
@@ -261,7 +354,7 @@ function diamondSubpath(
   );
 }
 
-function debugPolyline(
+function polyline(
   verts: readonly Vertex[],
   tx: number,
   ty: number,
