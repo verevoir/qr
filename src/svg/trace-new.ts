@@ -239,39 +239,54 @@ function floodRegion(
  * set of cells that lie inside its outer boundary (both the component
  * cells themselves AND any enclosed 0-cells, which are holes).
  *
- * Approach: scanline fill. For each row, find the leftmost and
- * rightmost component cells and fill everything between them. Any
- * 0-cell in that span is treated as interior — a potential hole.
+ * Approach: flood-fill the background from the grid perimeter through
+ * 4-connected non-component cells. Anything the flood can't reach is
+ * enclosed by the component = a hole. Mask = component ∪ holes.
  *
- * This is intentionally generous: concavities that open outward get
- * filled too, producing false-positive holes. The worst case is a
- * hole that doesn't need rendering — it adds a light cut-out where
- * there should be dark, which is benign (less harmful than filling
- * a genuine hollow solid, which breaks scanner contrast).
+ * This is conservative: narrow channels between diagonally-adjacent
+ * component cells may allow the flood to escape, causing some visually
+ * enclosed hollows to be missed. That's preferable to the alternative
+ * (scanline fill) which over-fills for grid-spanning components and
+ * flags the entire QR background as holes.
  */
 function buildMask(
   componentCells: readonly Vertex[],
   size: number,
 ): Uint8Array[] {
-  const mask = Array.from({ length: size }, () => new Uint8Array(size));
-  for (const v of componentCells) mask[v.y][v.x] = 1;
+  const inComp = Array.from({ length: size }, () => new Uint8Array(size));
+  for (const v of componentCells) inComp[v.y][v.x] = 1;
 
+  const reached = Array.from({ length: size }, () => new Uint8Array(size));
+  const queue: Vertex[] = [];
+  const enqueue = (x: number, y: number): void => {
+    if (x < 0 || x >= size || y < 0 || y >= size) return;
+    if (inComp[y][x]) return;
+    if (reached[y][x]) return;
+    reached[y][x] = 1;
+    queue.push({ x, y });
+  };
+  for (let x = 0; x < size; x++) {
+    enqueue(x, 0);
+    enqueue(x, size - 1);
+  }
   for (let y = 0; y < size; y++) {
-    let minX = size;
-    let maxX = -1;
-    for (let x = 0; x < size; x++) {
-      if (mask[y][x]) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-      }
-    }
-    if (minX <= maxX) {
-      for (let x = minX; x <= maxX; x++) {
-        mask[y][x] = 1;
-      }
-    }
+    enqueue(0, y);
+    enqueue(size - 1, y);
+  }
+  while (queue.length > 0) {
+    const { x, y } = queue.pop() as Vertex;
+    enqueue(x + 1, y);
+    enqueue(x - 1, y);
+    enqueue(x, y + 1);
+    enqueue(x, y - 1);
   }
 
+  const mask = Array.from({ length: size }, () => new Uint8Array(size));
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (inComp[y][x] || !reached[y][x]) mask[y][x] = 1;
+    }
+  }
   return mask;
 }
 
@@ -342,29 +357,20 @@ export function trace(cells: Uint8Array[]): Trace {
     }
     rawPath.push({ x: start.x, y: start.y });
 
-    // Expand the outer walk into the full 4-connected component, so
-    // interior cells the walker skipped (e.g. a + centre) are known
-    // before we build the mask.
-    const component = floodRegion([start], isTarget, size, true);
-
-    // Build the fill-mask and trace any enclosed hole regions.
-    const mask = buildMask(component, size);
-    const holes = traceHoles(cells, mask, size);
-
-    // Mark hole cells visited too, so the outer scanline loop doesn't
-    // revisit them. (Islands — 1-cells inside holes — are currently
-    // also marked; they'd be picked up as separate top-level dots if
-    // we ever want to surface them.)
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        if (mask[y][x]) grid.visit(x, y);
-      }
-    }
+    // Don't flood the entire 8-connected component — that would mark
+    // every connected cell visited and prevent subsequent walks from
+    // picking up the rest of the shape as separate paths. The walker
+    // already marks cells it visits; unvisited cells become new walks
+    // on the next scanline pass. Interior cells the walker skipped
+    // (e.g. a + centre) naturally become dots or small paths.
+    //
+    // Hole detection is deferred — the current style renders the
+    // skeleton directly and doesn't need holes punched out.
 
     paths.push({
       vertices: Array.from(vertexFilter(rawPath)),
-      holeVertices: holes.outlines,
-      dots: holes.dots,
+      holeVertices: [],
+      dots: [],
     });
   }
 

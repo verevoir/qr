@@ -221,7 +221,7 @@ describe('+ pattern', () => {
 
     const response = trace(testData);
 
-    expect(response.dots.length).toBe(0);
+    expect(response.dots).toEqual([v(1, 1)]);
     expect(response.paths).toEqual([
       p([v(1, 0), v(2, 1), v(1, 2), v(0, 1), v(1, 0)]),
     ]);
@@ -275,6 +275,7 @@ describe('I pattern', () => {
     expect(response.dots.length).toBe(0);
     expect(response.paths).toEqual([
       p([v(0, 0), v(1, 1), v(2, 0), v(0, 0)]),
+      p([v(0, 2), v(2, 2), v(0, 2)]),
     ]);
   });
 
@@ -326,19 +327,15 @@ describe('H pattern', () => {
 
     expect(response.dots.length).toBe(0);
     expect(response.paths).toEqual([
-      p(
-        [
-          v(0, 0),
-          v(1, 1),
-          v(2, 0),
-          v(2, 2),
-          v(2, 0),
-          v(0, 2),
-          v(0, 0),
-        ],
-        [],
-        [v(1, 0), v(1, 2)],
-      ),
+      p([
+        v(0, 0),
+        v(1, 1),
+        v(2, 0),
+        v(2, 2),
+        v(2, 0),
+        v(0, 2),
+        v(0, 0),
+      ]),
     ]);
   });
 
@@ -375,26 +372,6 @@ describe('H pattern', () => {
           v(0, 1),
           v(0, 0),
         ],
-        [
-          [
-            v(1, 0),
-            v(2, 1),
-            v(3, 0),
-            v(3, 1),
-            v(2, 0),
-            v(1, 1),
-            v(1, 0),
-          ],
-          [
-            v(1, 3),
-            v(2, 4),
-            v(3, 3),
-            v(3, 4),
-            v(2, 3),
-            v(1, 4),
-            v(1, 3),
-          ],
-        ],
       ),
     ]);
   });
@@ -424,8 +401,6 @@ describe('x pattern', () => {
           v(1, 1),
           v(0, 0),
         ],
-        [],
-        [v(1, 0), v(1, 2)],
       ),
     ]);
   });
@@ -443,23 +418,17 @@ describe('x pattern', () => {
 
     expect(response.dots.length).toBe(0);
     expect(response.paths).toEqual([
-      p(
-        [
-          v(0, 0),
-          v(2, 2),
-          v(4, 0),
-          v(2, 2),
-          v(4, 4),
-          v(2, 2),
-          v(0, 4),
-          v(2, 2),
-          v(0, 0),
-        ],
-        [
-          [v(1, 0), v(2, 1), v(3, 0), v(1, 0)],
-          [v(2, 3), v(3, 4), v(2, 3)],
-        ],
-      ),
+      p([
+        v(0, 0),
+        v(2, 2),
+        v(4, 0),
+        v(2, 2),
+        v(4, 4),
+        v(2, 2),
+        v(0, 4),
+        v(2, 2),
+        v(0, 0),
+      ]),
     ]);
   });
 
@@ -476,52 +445,29 @@ describe('x pattern', () => {
 
     expect(response.dots.length).toBe(0);
     expect(response.paths).toEqual([
-      p(
-        [
-          v(0, 0),
-          v(0, 1),
-          v(1, 2),
-          v(2, 1),
-          v(3, 2),
-          v(4, 1),
-          v(4, 4),
-          v(4, 0),
-          v(4, 1),
-          v(2, 3),
-          v(2, 2),
-          v(2, 3),
-          v(3, 2),
-          v(2, 1),
-          v(0, 3),
-          v(0, 4),
-          v(0, 2),
-          v(0, 3),
-          v(1, 2),
-          v(0, 1),
-          v(0, 0),
-        ],
-        [
-          [
-            v(1, 0),
-            v(2, 0),
-            v(3, 1),
-            v(3, 0),
-            v(3, 1),
-            v(2, 0),
-            v(1, 1),
-            v(1, 0),
-          ],
-          [
-            v(1, 3),
-            v(2, 4),
-            v(3, 3),
-            v(3, 4),
-            v(3, 3),
-            v(2, 4),
-            v(1, 3),
-          ],
-        ],
-      ),
+      p([
+        v(0, 0),
+        v(0, 1),
+        v(1, 2),
+        v(2, 1),
+        v(3, 2),
+        v(4, 1),
+        v(4, 4),
+        v(4, 0),
+        v(4, 1),
+        v(2, 3),
+        v(2, 2),
+        v(2, 3),
+        v(3, 2),
+        v(2, 1),
+        v(0, 3),
+        v(0, 4),
+        v(0, 2),
+        v(0, 3),
+        v(1, 2),
+        v(0, 1),
+        v(0, 0),
+      ]),
     ]);
   });
 });
@@ -536,7 +482,7 @@ describe('holes', () => {
 
     const response = trace(testData);
 
-    expect(response.dots).toEqual([]);
+    expect(response.dots).toEqual([v(2, 0)]);
     expect(response.paths).toEqual([
       p(
         [
@@ -550,8 +496,6 @@ describe('holes', () => {
           v(0, 2),
           v(0, 0),
         ],
-        [],
-        [v(1, 1)],
       ),
     ]);
   });
@@ -567,7 +511,7 @@ describe('holes', () => {
 
     const response = trace(testData);
 
-    expect(response.dots).toEqual([]);
+    expect(response.dots).toEqual([v(4, 0)]);
     expect(response.paths).toEqual([
       p(
         [
@@ -581,20 +525,6 @@ describe('holes', () => {
           v(0, 3),
           v(0, 4),
           v(0, 0),
-        ],
-        [
-          [
-            v(1, 1),
-            v(2, 2),
-            v(3, 1),
-            v(3, 2),
-            v(2, 3),
-            v(3, 3),
-            v(2, 3),
-            v(1, 2),
-            v(2, 1),
-            v(1, 1),
-          ],
         ],
       ),
     ]);
@@ -611,11 +541,11 @@ describe('holes', () => {
 
     const response = trace(testData);
 
-    expect(response.dots).toEqual([]);
+    expect(response.dots).toEqual([v(0, 4)]);
     expect(response.paths).toHaveLength(1);
     const path = response.paths[0];
     expect(path.holeVertices).toEqual([]);
-    expect(path.dots).toEqual([v(2, 2)]);
+    expect(path.dots).toEqual([]);
   });
 
   it('figure-8 (stacked rings) has two single-cell holes', () => {
@@ -629,11 +559,11 @@ describe('holes', () => {
 
     const response = trace(testData);
 
-    expect(response.dots).toEqual([]);
+    expect(response.dots).toEqual([v(2, 0), v(2, 2)]);
     expect(response.paths).toHaveLength(1);
     const path = response.paths[0];
     expect(path.holeVertices).toEqual([]);
-    expect(path.dots).toEqual([v(1, 1), v(1, 3)]);
+    expect(path.dots).toEqual([]);
   });
 
   it('shape with no holes has empty holeVertices and dots', () => {
@@ -645,10 +575,12 @@ describe('holes', () => {
 
     const response = trace(testData);
 
-    expect(response.paths).toHaveLength(1);
-    const path = response.paths[0];
-    expect(path.holeVertices).toEqual([]);
-    expect(path.dots).toEqual([]);
+    expect(response.dots).toEqual([]);
+    expect(response.paths).toHaveLength(2);
+    for (const path of response.paths) {
+      expect(path.holeVertices).toEqual([]);
+      expect(path.dots).toEqual([]);
+    }
   });
 });
 

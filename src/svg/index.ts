@@ -18,6 +18,7 @@ import { renderScribble, renderMetroScribble } from './scribble.js';
 import {
   toSvgOutline,
   toSvgOutlineNarrow,
+  toSvgOutlineDebug,
   SHARP,
   ROUNDED,
   SHARP_DIAGONAL,
@@ -45,6 +46,8 @@ export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
     });
   if (style === 'outline-narrow')
     return toSvgOutlineNarrow(qr, { cornerStyle, color });
+  if (style === 'outline-debug')
+    return toSvgOutlineDebug(qr, { cornerStyle, color });
 
   // Corner patterns (finder + alignment)
   let content = renderCorners(qr, cornerStyle);

@@ -254,6 +254,78 @@ export function toSvgOutlineNarrow(
 }
 
 /**
+ * Debug renderer — shows the raw walker paths as thin stroked lines
+ * and dots as small circles. No offset maths, no fill-rule gymnastics.
+ * Just "what did the walker produce?" rendered visually.
+ *
+ * Paths: thin black stroked polylines (stroke-width 0.25).
+ * Holes: thin red stroked polylines.
+ * Dots: small black filled circles (r=0.125).
+ * Hole-dots: small red filled circles.
+ */
+export function toSvgOutlineDebug(
+  qr: QrMatrix,
+  options: OutlineOptions = {},
+): string {
+  const cornerStyle = options.cornerStyle ?? 'rounded';
+  const finderOnlyQr: QrMatrix = { ...qr, alignmentCoordinates: [] };
+  const finderContent = renderCorners(finderOnlyQr, cornerStyle);
+
+  const grid = buildDataGrid(qr);
+  const traced = traceNew(grid);
+  const tx = 1;
+  const ty = 1;
+  const sw = 0.25;
+  const r = sw / 2;
+
+  let dataContent = '';
+  for (const path of traced.paths) {
+    dataContent += debugPolyline(path.vertices, tx, ty, '#000', sw);
+    for (const hole of path.holeVertices) {
+      dataContent += debugPolyline(hole, tx, ty, '#c00', sw);
+    }
+    for (const dot of path.dots) {
+      dataContent += `<circle cx="${fmt(dot.x + 0.5 + tx)}" cy="${fmt(dot.y + 0.5 + ty)}" r="${r}" fill="#c00"/>`;
+    }
+  }
+  for (const dot of traced.dots) {
+    dataContent += `<circle cx="${fmt(dot.x + 0.5 + tx)}" cy="${fmt(dot.y + 0.5 + ty)}" r="${r}" fill="#000"/>`;
+  }
+
+  const viewSize = qr.size + 2;
+  const color = options.color ?? {};
+  const coloured = applyColours(
+    `<g id="finder">${finderContent}</g><g id="data">${dataContent}</g>`,
+    color,
+  );
+  const bg = color.background
+    ? `<rect width="${viewSize}" height="${viewSize}" fill="${color.background}"/>`
+    : `<rect width="${viewSize}" height="${viewSize}" fill="#fff"/>`;
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewSize} ${viewSize}">` +
+    bg +
+    coloured +
+    `</svg>`
+  );
+}
+
+function debugPolyline(
+  verts: readonly VertexNew[],
+  tx: number,
+  ty: number,
+  color: string,
+  strokeWidth: number,
+): string {
+  if (verts.length < 2) return '';
+  let d = `M${fmt(verts[0].x + 0.5 + tx)},${fmt(verts[0].y + 0.5 + ty)}`;
+  for (let i = 1; i < verts.length; i++) {
+    d += `L${fmt(verts[i].x + 0.5 + tx)},${fmt(verts[i].y + 0.5 + ty)}`;
+  }
+  d += 'Z';
+  return `<path d="${d}" stroke="${color}" stroke-width="${strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+
+/**
  * Convert the QR matrix into a `Uint8Array[]` grid suitable for
  * `trace-new.ts`, with finder regions zeroed out.
  */
@@ -347,7 +419,6 @@ export function offsetSubpath(
   const n = vertices.length;
   if (n < 2) return '';
 
-  const MITER_LIMIT = 2;
   const points: { x: number; y: number }[] = [];
 
   for (let i = 0; i < n; i++) {
@@ -386,24 +457,24 @@ export function offsetSubpath(
         y: cy + halfWidth * (u1y - p1y),
       });
     } else {
-      const sx = (p1x + p2x) / denom;
-      const sy = (p1y + p2y) / denom;
-      const miterLen = Math.sqrt(sx * sx + sy * sy);
-      if (miterLen > MITER_LIMIT) {
-        // Bevel — two points at the ends of adjacent offset edges
-        points.push({
-          x: cx + halfWidth * p1x,
-          y: cy + halfWidth * p1y,
-        });
-        points.push({
-          x: cx + halfWidth * p2x,
-          y: cy + halfWidth * p2y,
-        });
-      } else {
-        // Clean miter — single point
+      // Cross product of tangent vectors determines whether the left
+      // side of the CW path is the outside (convex) or inside
+      // (concave) of this turn.
+      const cross = u1x * u2y - u1y * u2x;
+      if (cross >= 0) {
+        // Outside corner (CW turn) — miter gives a clean sharp point
+        const sx = (p1x + p2x) / denom;
+        const sy = (p1y + p2y) / denom;
         points.push({
           x: cx + halfWidth * sx,
           y: cy + halfWidth * sy,
+        });
+      } else {
+        // Inside corner (CCW turn) — average the two offset points
+        // to prevent the crossover loop that a miter would create
+        points.push({
+          x: cx + halfWidth * (p1x + p2x) / 2,
+          y: cy + halfWidth * (p1y + p2y) / 2,
         });
       }
     }
