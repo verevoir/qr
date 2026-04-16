@@ -1,0 +1,87 @@
+# @verevoir/qr
+
+QR code encoding engine and SVG renderers. Zero runtime dependencies. Pure TypeScript.
+
+## Why use this over node-qrcode?
+
+node-qrcode pulls in pngjs, dijkstrajs, and yargs as runtime dependencies. It produces one visual style (basic square grid), returns a single mask variant, and requires the `canvas` npm package for many operations.
+
+@verevoir/qr has zero runtime dependencies, works identically in Node and browsers, and offers:
+
+- 10 visual styles: square, dots, diamonds, horizontal, vertical, diagonal, network, circuit, metro, scribble
+- Multi-candidate mask selection (all masks within 30% of best penalty score)
+- Fabrication-ready SVG output (closed filled paths for laser cutting, CNC, vinyl)
+- Full colour control (dark, light, background)
+- Two corner styles for finder patterns (square, rounded)
+- Line width control (normal/thin) across all styles
+- PNG output via optional @resvg/resvg-js peer dep (lazy-imported, tree-shakes out if unused)
+
+Drop-in compatible: `import QRCode from '@verevoir/qr/qrcode'` replaces `import QRCode from 'qrcode'` with the same API surface (create, toString, toFile, toBuffer, toCanvas, toDataURL).
+
+## Quick start
+
+```ts
+import { encode, toSvg } from '@verevoir/qr';
+
+const candidates = encode('https://example.com');
+const svg = toSvg(candidates[0], {
+  style: 'network',
+  cornerStyle: 'rounded',
+  lineWidth: 'thin',
+  color: { dark: '#1a1a2e', background: '#ffffff' },
+});
+```
+
+## Styles
+
+| Style | Description |
+|-------|-------------|
+| square | Filled squares per module (default) |
+| dots | Round dots — dark and light layers for image overlay |
+| diamonds | Diamond-shaped modules rotated 45 degrees |
+| horizontal | Horizontal line segments for consecutive dark modules |
+| vertical | Vertical line segments |
+| diagonal | Diagonal line segments |
+| network | Connected traced paths with diamond tips at endpoints |
+| circuit | Connected traced paths with circular tips |
+| metro | Layered horizontal, vertical and diagonal lines |
+| scribble | Connected component walking with bezier-smoothed turns |
+
+All styles respect the `lineWidth` option ('normal' or 'thin') and produce scannable output.
+
+## API
+
+### Main entry (`@verevoir/qr`)
+
+- `encode(text, options?)` — returns `QrResult[]` (multiple mask candidates)
+- `toSvg(qr, options?)` — renders a QrResult as an SVG string
+
+Options: `{ style, cornerStyle, lineWidth, color: { dark, light, background } }`
+
+### Node (`@verevoir/qr/node`)
+
+- `toFile(path, text, options?)` — write SVG or PNG (by extension)
+- `toBuffer(text, options?)` — return SVG or PNG Buffer
+
+PNG requires `@resvg/resvg-js` as an optional peer dependency.
+
+### Browser (`@verevoir/qr/web`)
+
+- `svgToPng(svg, size?)` — render SVG to PNG Blob via canvas
+- `downloadPng(svg, filename?, size?)` — trigger PNG file download
+- `createSvgElement(svg)` — parse SVG string to DOM element
+- `renderIntoElement(container, svg)` — insert SVG into a container
+
+### node-qrcode shim (`@verevoir/qr/qrcode`)
+
+Drop-in replacement for the `qrcode` npm package. Same API: `create`, `toString`, `toFile`, `toBuffer`, `toCanvas`, `toDataURL`. Supports callback and Promise forms.
+
+## Architecture
+
+- `src/encode.ts` — top-level encoder orchestrating version selection, data encoding, matrix construction, mask evaluation
+- `src/svg/trace.ts` — per-cell DFS walker producing vertex paths from cell grids
+- `src/svg/outline.ts` — cell-based and trace-based renderers (renderCells, renderOutline, renderCircuit)
+- `src/svg/index.ts` — style multiplexer (toSvg dispatches to renderers, adds corners, wraps SVG)
+- `src/svg/corners.ts` — finder and alignment pattern rendering
+
+Zero runtime dependencies. ~52KB core bundle (ESM). TypeScript source with full .d.ts output.
