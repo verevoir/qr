@@ -193,10 +193,17 @@ function walk(
  * subset of the component, and this flood picks up any cells the
  * walker skipped (e.g. the centre of a 5×5 +).
  */
+/**
+ * @param diagonal  When `true`, use 8-connectivity (include diagonal
+ *   neighbours). Required for component expansion since the walker
+ *   traces components via 8-connected diagonals. Hole floods should
+ *   use the default 4-connectivity (opposite of the foreground rule).
+ */
 function floodRegion(
   seeds: readonly Vertex[],
   isMember: (x: number, y: number) => boolean,
   size: number,
+  diagonal = false,
 ): Vertex[] {
   const seen = new Set<string>();
   const region: Vertex[] = [];
@@ -217,6 +224,12 @@ function floodRegion(
     push({ x: x - 1, y });
     push({ x, y: y + 1 });
     push({ x, y: y - 1 });
+    if (diagonal) {
+      push({ x: x + 1, y: y + 1 });
+      push({ x: x + 1, y: y - 1 });
+      push({ x: x - 1, y: y + 1 });
+      push({ x: x - 1, y: y - 1 });
+    }
   }
   return region;
 }
@@ -226,54 +239,39 @@ function floodRegion(
  * set of cells that lie inside its outer boundary (both the component
  * cells themselves AND any enclosed 0-cells, which are holes).
  *
- * Approach: flood-fill the *background* (0-cells outside the
- * component) from the grid's outer boundary through 4-connected
- * non-component cells. Anything the flood doesn't reach is either a
- * component cell (definitionally inside) or an enclosed 0-cell — a
- * hole. Mask = component ∪ holes.
+ * Approach: scanline fill. For each row, find the leftmost and
+ * rightmost component cells and fill everything between them. Any
+ * 0-cell in that span is treated as interior — a potential hole.
  *
- * The returned mask is suitable as input to `traceHoles`: the hole
- * walker only considers cells where `mask === 1 && cells === 0`, so
- * holes are exactly the walkable region.
+ * This is intentionally generous: concavities that open outward get
+ * filled too, producing false-positive holes. The worst case is a
+ * hole that doesn't need rendering — it adds a light cut-out where
+ * there should be dark, which is benign (less harmful than filling
+ * a genuine hollow solid, which breaks scanner contrast).
  */
 function buildMask(
   componentCells: readonly Vertex[],
   size: number,
 ): Uint8Array[] {
-  const inComp = Array.from({ length: size }, () => new Uint8Array(size));
-  for (const v of componentCells) inComp[v.y][v.x] = 1;
-
-  const reached = Array.from({ length: size }, () => new Uint8Array(size));
-  const queue: Vertex[] = [];
-  const enqueue = (x: number, y: number): void => {
-    if (x < 0 || x >= size || y < 0 || y >= size) return;
-    if (inComp[y][x]) return;
-    if (reached[y][x]) return;
-    reached[y][x] = 1;
-    queue.push({ x, y });
-  };
-  for (let x = 0; x < size; x++) {
-    enqueue(x, 0);
-    enqueue(x, size - 1);
-  }
-  for (let y = 0; y < size; y++) {
-    enqueue(0, y);
-    enqueue(size - 1, y);
-  }
-  while (queue.length > 0) {
-    const { x, y } = queue.pop() as Vertex;
-    enqueue(x + 1, y);
-    enqueue(x - 1, y);
-    enqueue(x, y + 1);
-    enqueue(x, y - 1);
-  }
-
   const mask = Array.from({ length: size }, () => new Uint8Array(size));
+  for (const v of componentCells) mask[v.y][v.x] = 1;
+
   for (let y = 0; y < size; y++) {
+    let minX = size;
+    let maxX = -1;
     for (let x = 0; x < size; x++) {
-      if (inComp[y][x] || !reached[y][x]) mask[y][x] = 1;
+      if (mask[y][x]) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+      }
+    }
+    if (minX <= maxX) {
+      for (let x = minX; x <= maxX; x++) {
+        mask[y][x] = 1;
+      }
     }
   }
+
   return mask;
 }
 
@@ -347,7 +345,7 @@ export function trace(cells: Uint8Array[]): Trace {
     // Expand the outer walk into the full 4-connected component, so
     // interior cells the walker skipped (e.g. a + centre) are known
     // before we build the mask.
-    const component = floodRegion([start], isTarget, size);
+    const component = floodRegion([start], isTarget, size, true);
 
     // Build the fill-mask and trace any enclosed hole regions.
     const mask = buildMask(component, size);

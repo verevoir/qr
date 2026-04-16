@@ -3,7 +3,9 @@ import { renderCorners } from './corners.js';
 import { applyColours } from './shared.js';
 import { traceComponents, cellKey } from './trace.js';
 import type { CellKey, CellSet, Path } from './trace.js';
-import { render, renderNarrow } from './render.js';
+import { render } from './render.js';
+import { trace as traceNew } from './trace-new.js';
+import type { Trace as TraceNew, Vertex as VertexNew } from './trace-new.js';
 
 // ---------------------------------------------------------------------------
 // Public treatment API
@@ -205,12 +207,17 @@ export function toSvgOutline(
 }
 
 /**
- * Narrow-outline renderer — calls `renderNarrow` directly on the
- * `Trace` so each component becomes a thin outline band (outer CW +
- * inner CCW) and each single-cell dot becomes a diamond. No dot
- * rebuild; no per-edge miter maths. Scaffolding for driving the
- * new algorithm through slinqi; we'll clean up the options surface
- * once we know what we want.
+ * Outline renderer using the new per-cell DFS walker (trace-new.ts).
+ *
+ * Renders each traced component as a filled polygon with holes cut
+ * out via `evenodd` fill-rule. Single-cell dots (standalone or
+ * inside holes) render as diamonds. The walker's vertex output maps
+ * directly to SVG coordinates — each vertex `{x, y}` is the
+ * top-left corner of the cell at column `x`, row `y` in grid space.
+ *
+ * Hole outlines are emitted as additional sub-paths inside the same
+ * `<path>` element; `evenodd` makes them punch through regardless
+ * of winding order.
  */
 export function toSvgOutlineNarrow(
   qr: QrMatrix,
@@ -221,12 +228,10 @@ export function toSvgOutlineNarrow(
   const finderOnlyQr: QrMatrix = { ...qr, alignmentCoordinates: [] };
   const finderContent = renderCorners(finderOnlyQr, cornerStyle);
 
-  const cells = buildDataCellSet(qr);
-  const trace = traceComponents(cells, { diagonals: false, saddleNotch: 0 });
-  const pathData = renderNarrow(trace, {
-    offset: 0.1,
-    translate: [1, 1],
-  });
+  const grid = buildDataGrid(qr);
+  const traced = traceNew(grid);
+  const pathData = renderTraceNew(traced, 1, 1);
+
   const dataContent = pathData
     ? `<path d="${pathData}" fill="#000" fill-rule="nonzero"/>`
     : '';
@@ -246,6 +251,206 @@ export function toSvgOutlineNarrow(
     coloured +
     `</svg>`
   );
+}
+
+/**
+ * Convert the QR matrix into a `Uint8Array[]` grid suitable for
+ * `trace-new.ts`, with finder regions zeroed out.
+ */
+function buildDataGrid(qr: QrMatrix): Uint8Array[] {
+  const { size, matrix, finderCoordinates } = qr;
+  const excluded = new Set<string>();
+  for (const [fr, fc] of finderCoordinates) {
+    for (let r = fr; r < Math.min(fr + 7, size); r++) {
+      for (let c = fc; c < Math.min(fc + 7, size); c++) {
+        excluded.add(`${r},${c}`);
+      }
+    }
+  }
+  const grid: Uint8Array[] = [];
+  for (let r = 0; r < size; r++) {
+    const row = new Uint8Array(size);
+    for (let c = 0; c < size; c++) {
+      if (matrix[r][c] === 1 && !excluded.has(`${r},${c}`)) row[c] = 1;
+    }
+    grid.push(row);
+  }
+  return grid;
+}
+
+/**
+ * Render trace-new output as an SVG path-data string.
+ *
+ * The walker's vertices are a centreline through cell positions.
+ * Each edge is offset perpendicular to produce the actual boundary:
+ *
+ * - Outer outlines inflate outward (left-hand perpendicular for CW
+ *   winding) by `halfWidth`, producing the shape's filled boundary.
+ * - Hole outlines deflate inward (right-hand perpendicular) by
+ *   `halfWidth`, so they cut into the shape.
+ * - Dots (standalone + hole-dots) render as diamonds.
+ *
+ * At each vertex the miter point of adjacent offset edges is
+ * computed. 180° reversals (dead-end spikes) emit a flat cap.
+ */
+function renderTraceNew(
+  traced: TraceNew,
+  tx: number,
+  ty: number,
+): string {
+  const halfWidth = 0.5;
+  let d = '';
+
+  for (const path of traced.paths) {
+    d += offsetSubpath(path.vertices, halfWidth, tx, ty);
+    for (const hole of path.holeVertices) {
+      d += offsetSubpath(hole, halfWidth, tx, ty, true);
+    }
+    for (const dot of path.dots) {
+      d += diamondSubpath(dot.x + 0.5, dot.y + 0.5, halfWidth, tx, ty);
+    }
+  }
+  for (const dot of traced.dots) {
+    d += diamondSubpath(dot.x + 0.5, dot.y + 0.5, halfWidth, tx, ty);
+  }
+  return d;
+}
+
+/**
+ * Offset a closed centreline path perpendicular to each edge,
+ * computing miter joins at corners. Falls back to a bevel (two
+ * points) when the miter ratio exceeds `MITER_LIMIT` to prevent
+ * spikes at sharp DFS-backtrack turns.
+ *
+ * Vertices are cell positions `{x, y}`, shifted to cell centres
+ * `(x+0.5, y+0.5)` before offsetting.
+ *
+ * `halfWidth > 0` inflates outward (for outer boundaries).
+ * When `reverse` is true, the output polygon winds CCW — used for
+ * hole subpaths so `fill-rule="nonzero"` punches them through.
+ */
+export function offsetSubpath(
+  verts: readonly VertexNew[],
+  halfWidth: number,
+  tx: number,
+  ty: number,
+  reverse = false,
+): string {
+  // Strip duplicate closing vertex — the walker emits start at both
+  // ends, but the offset loop wraps cyclically so the last→first
+  // edge is implicit.
+  const last = verts[verts.length - 1];
+  const vertices =
+    verts.length > 2 && last.x === verts[0].x && last.y === verts[0].y
+      ? verts.slice(0, -1)
+      : verts;
+  const n = vertices.length;
+  if (n < 2) return '';
+
+  const MITER_LIMIT = 2;
+  const points: { x: number; y: number }[] = [];
+
+  for (let i = 0; i < n; i++) {
+    const prev = vertices[(i - 1 + n) % n];
+    const curr = vertices[i];
+    const next = vertices[(i + 1) % n];
+
+    const cx = curr.x + 0.5;
+    const cy = curr.y + 0.5;
+
+    const [u1x, u1y] = unitTan(
+      prev.x + 0.5,
+      prev.y + 0.5,
+      cx,
+      cy,
+    );
+    const [u2x, u2y] = unitTan(cx, cy, next.x + 0.5, next.y + 0.5);
+
+    // Left-hand perpendiculars (outward for CW in SVG y-down)
+    const p1x = u1y;
+    const p1y = -u1x;
+    const p2x = u2y;
+    const p2y = -u2x;
+
+    const denom = 1 + u1x * u2x + u1y * u2y;
+    if (Math.abs(denom) < 1e-9) {
+      // 180° reversal — square cap extending halfWidth beyond the
+      // vertex along the incoming edge direction, so degenerate
+      // capsules (2-vertex lines) cover both cells fully.
+      points.push({
+        x: cx + halfWidth * (u1x + p1x),
+        y: cy + halfWidth * (u1y + p1y),
+      });
+      points.push({
+        x: cx + halfWidth * (u1x - p1x),
+        y: cy + halfWidth * (u1y - p1y),
+      });
+    } else {
+      const sx = (p1x + p2x) / denom;
+      const sy = (p1y + p2y) / denom;
+      const miterLen = Math.sqrt(sx * sx + sy * sy);
+      if (miterLen > MITER_LIMIT) {
+        // Bevel — two points at the ends of adjacent offset edges
+        points.push({
+          x: cx + halfWidth * p1x,
+          y: cy + halfWidth * p1y,
+        });
+        points.push({
+          x: cx + halfWidth * p2x,
+          y: cy + halfWidth * p2y,
+        });
+      } else {
+        // Clean miter — single point
+        points.push({
+          x: cx + halfWidth * sx,
+          y: cy + halfWidth * sy,
+        });
+      }
+    }
+  }
+
+  if (points.length === 0) return '';
+  if (reverse) points.reverse();
+  let s = `M${fmt(points[0].x + tx)},${fmt(points[0].y + ty)}`;
+  for (let i = 1; i < points.length; i++) {
+    s += `L${fmt(points[i].x + tx)},${fmt(points[i].y + ty)}`;
+  }
+  return s + 'Z';
+}
+
+function unitTan(
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+): [number, number] {
+  const dx = toX - fromX;
+  const dy = toY - fromY;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len === 0) return [0, 0];
+  return [dx / len, dy / len];
+}
+
+function diamondSubpath(
+  cx: number,
+  cy: number,
+  half: number,
+  tx: number,
+  ty: number,
+): string {
+  const x = cx + tx;
+  const y = cy + ty;
+  return (
+    `M${fmt(x)},${fmt(y - half)}` +
+    `L${fmt(x + half)},${fmt(y)}` +
+    `L${fmt(x)},${fmt(y + half)}` +
+    `L${fmt(x - half)},${fmt(y)}Z`
+  );
+}
+
+function fmt(n: number): string {
+  const rounded = Math.round(n * 10000) / 10000;
+  return String(rounded === 0 ? 0 : rounded);
 }
 
 /**
