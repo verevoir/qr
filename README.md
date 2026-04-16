@@ -13,7 +13,7 @@ There are a number of style variations but these are some examples.
 
 - **Encode** — text in, QR matrix out. Versions 1–40, all four error correction levels, auto mode selection.
 - **Multiple masks** — gives you several mask variants ranked by quality, so you pick the one that looks best for your use case.
-- **SVG rendering** — ten styles, three corner shapes, two line weights. Most styles output closed paths directly.
+- **SVG rendering** — ten styles, two corner shapes, two line weights. Most styles output closed paths directly.
 - **PNG export** — `svgToPng()` and `downloadPng()` for browser use. No server needed.
 
 ## Install
@@ -52,18 +52,18 @@ const qr = results[0];
 const styles: SvgStyle[] = [
   'square',
   'dots',
+  'diamonds',
   'horizontal',
   'vertical',
   'diagonal',
-  'grid',
-  'lines',
+  'network',
+  'circuit',
   'metro',
   'scribble',
-  'scribble-alt',
 ];
 
 for (const style of styles) {
-  const svg = toSvg(qr, { style, cornerStyle: 'round' });
+  const svg = toSvg(qr, { style, cornerStyle: 'rounded' });
   // Each produces a distinct visual treatment of the same data
 }
 ```
@@ -100,27 +100,27 @@ await downloadPng(svg, { size: 1024, filename: 'qr-code.png' });
 
 ### Options
 
-| Type          | Values                                                                                                                                             | Default    |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `SvgStyle`    | `'square'` \| `'dots'` \| `'horizontal'` \| `'vertical'` \| `'diagonal'` \| `'grid'` \| `'lines'` \| `'metro'` \| `'scribble'` \| `'scribble-alt'` | `'square'` |
-| `CornerStyle` | `'square'` \| `'rounded'` \| `'round'`                                                                                                             | `'square'` |
+| Type          | Values                                                                                                                                                   | Default    |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `SvgStyle`    | `'square'` \| `'dots'` \| `'diamonds'` \| `'horizontal'` \| `'vertical'` \| `'diagonal'` \| `'network'` \| `'circuit'` \| `'metro'` \| `'scribble'`     | `'square'` |
+| `CornerStyle` | `'square'` \| `'rounded'`                                                                                                                                | `'square'` |
 | `LineWidth`   | `'normal'` \| `'thin'`                                                                                                                             | `'normal'` |
 | `ErrorLevel`  | `'L'` \| `'M'` \| `'Q'` \| `'H'`                                                                                                                   | `'L'`      |
 
 ### SVG Styles
 
-| Style          | Description                                                                |
-| -------------- | -------------------------------------------------------------------------- |
-| `square`       | Filled rectangles per module                                               |
-| `dots`         | Dark and light circles on separate layers                                  |
-| `horizontal`   | Horizontal line segments for consecutive dark modules                      |
-| `vertical`     | Vertical line segments for consecutive dark modules                        |
-| `diagonal`     | Diagonal line segments in both directions                                  |
-| `grid`         | Connected dark regions traced as filled outline paths                      |
-| `lines`        | Diagonal-first tubemap-style paths, then horizontal and vertical           |
-| `metro`        | Horizontal over vertical over diagonal layered lines                       |
-| `scribble`     | Connected component walking with diagonal zigzag and bezier-smoothed turns |
-| `scribble-alt` | Connected component walking with horizontal zigzag and angular turns       |
+| Style       | Description                                                  |
+| ----------- | ------------------------------------------------------------ |
+| `square`    | Filled squares per module (default)                          |
+| `dots`      | Round dots — dark and light on the same layer                |
+| `diamonds`  | Diamond-shaped modules rotated 45°                           |
+| `horizontal`| Horizontal line segments                                     |
+| `vertical`  | Vertical line segments                                       |
+| `diagonal`  | Diagonal line segments                                       |
+| `network`   | Connected traced paths with diamond tips                     |
+| `circuit`   | Connected traced paths with circular tips                    |
+| `metro`     | Layered horizontal, vertical and diagonal lines              |
+| `scribble`  | Connected component walking with bezier-smoothed turns       |
 
 ## Architecture
 
@@ -132,7 +132,7 @@ await downloadPng(svg, { size: 1024, filename: 'qr-code.png' });
 | `src/matrix.ts` | QR matrix construction, module placement, format/version info                                                     |
 | `src/mask.ts`   | Mask evaluation, penalty scoring, multi-candidate ranking                                                         |
 | `src/encode.ts` | Top-level `encode()` entry point                                                                                  |
-| `src/svg/`      | SVG renderers (square, dots, horizontal, vertical, diagonal, grid, lines, metro, scribble, scribble-alt, corners) |
+| `src/svg/`      | SVG renderers (square, dots, diamonds, horizontal, vertical, diagonal, network, circuit, metro, scribble, corners) |
 | `src/png.ts`    | PNG export via browser canvas                                                                                     |
 
 ## Design Decisions

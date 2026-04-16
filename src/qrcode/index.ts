@@ -116,8 +116,7 @@ export function toString(
   // The underlying work is synchronous; wrap in Promise.resolve /
   // Promise.reject so the return type stays `Promise<string>` and
   // node-qrcode's type contract ports over unchanged. Callers who
-  // want the raw sync result can use `create()` + the v2 `toSvg` /
-  // `toSvgOutline` directly.
+  // want the raw sync result can use `create()` + the v2 `toSvg` directly.
   let result: string;
   try {
     result = buildString(text, options);

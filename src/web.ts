@@ -8,7 +8,7 @@
  * bundlers that respect the exports map will resolve it correctly in
  * web builds.
  *
- * For the universal API (encode, toSvg, toSvgOutline, types), import
+ * For the universal API (encode, toSvg, types), import
  * from `@verevoir/qr` instead.
  */
 
