@@ -15,15 +15,7 @@ import { renderDiagonal } from './diagonal.js';
 import { renderGrid } from './grid.js';
 import { renderTubemap, renderMetro } from './tubemap.js';
 import { renderScribble, renderMetroScribble } from './scribble.js';
-import {
-  toSvgOutline,
-  toSvgOutlineNarrow,
-  toSvgOutlineDebug,
-  SHARP,
-  ROUNDED,
-  SHARP_DIAGONAL,
-  ROUNDED_DIAGONAL,
-} from './outline.js';
+import { toSvgOutlineDebug } from './outline.js';
 
 export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
   const style: SvgStyle = options?.style ?? 'square';
@@ -31,21 +23,7 @@ export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
   const lineWidth: LineWidth = options?.lineWidth ?? 'normal';
   const color = options?.color;
 
-  // Outline pipeline produces its own complete SVG with named groups.
-  if (style === 'outline')
-    return toSvgOutline(qr, { cornerStyle, treatment: SHARP, color });
-  if (style === 'outline-round')
-    return toSvgOutline(qr, { cornerStyle, treatment: ROUNDED, color });
-  if (style === 'outline-diagonal')
-    return toSvgOutline(qr, { cornerStyle, treatment: SHARP_DIAGONAL, color });
-  if (style === 'outline-round-diagonal')
-    return toSvgOutline(qr, {
-      cornerStyle,
-      treatment: ROUNDED_DIAGONAL,
-      color,
-    });
-  if (style === 'outline-narrow')
-    return toSvgOutlineNarrow(qr, { cornerStyle, color });
+  // Outline pipeline — new trace-new walker.
   if (style === 'outline-debug')
     return toSvgOutlineDebug(qr, { cornerStyle, color });
 

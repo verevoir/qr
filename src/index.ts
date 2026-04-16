@@ -14,18 +14,7 @@
 
 export { encode } from './encode.js';
 export { toSvg } from './svg/index.js';
-export {
-  toSvgOutline,
-  SHARP,
-  ROUNDED,
-  SHARP_DIAGONAL,
-  ROUNDED_DIAGONAL,
-} from './svg/outline.js';
-export type {
-  TreatmentOptions,
-  CornerTreatment,
-  OutlineOptions,
-} from './svg/outline.js';
+export type { OutlineOptions } from './svg/outline.js';
 export type {
   ErrorLevel,
   SvgStyle,

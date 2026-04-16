@@ -42,10 +42,10 @@ describe('toSvg', () => {
       expect(svg).toMatch(/<rect width="\d+" height="\d+" fill="#eeeeee"\/>/);
     });
 
-    it('outline styles respect color options', () => {
+    it('outline-debug style respects color options', () => {
       const qr = getQr();
       const svg = toSvg(qr, {
-        style: 'outline',
+        style: 'outline-debug',
         color: { dark: '#123456', light: '#abcdef' },
       });
       expect(svg).toContain('fill="#123456"');
@@ -67,10 +67,7 @@ describe('toSvg', () => {
     'vertical',
     'diagonal',
     'grid',
-    'outline',
-    'outline-round',
-    'outline-diagonal',
-    'outline-round-diagonal',
+    'outline-debug',
   ];
 
   for (const style of styles) {
@@ -175,56 +172,28 @@ describe('toSvg', () => {
     });
   });
 
-  describe('outline styles', () => {
-    it("'outline' produces named finder and data groups", () => {
+  describe('outline-debug style', () => {
+    it('produces named finder and data groups', () => {
       const qr = getQr();
-      const svg = toSvg(qr, { style: 'outline' });
+      const svg = toSvg(qr, { style: 'outline-debug' });
       expect(svg).toContain('id="finder"');
       expect(svg).toContain('id="data"');
     });
 
-    it("'outline-round' produces named finder and data groups", () => {
+    it('data group contains stroked paths', () => {
       const qr = getQr();
-      const svg = toSvg(qr, { style: 'outline-round' });
-      expect(svg).toContain('id="finder"');
-      expect(svg).toContain('id="data"');
-    });
-
-    it("'outline' data group contains filled paths", () => {
-      const qr = getQr();
-      const svg = toSvg(qr, { style: 'outline' });
+      const svg = toSvg(qr, { style: 'outline-debug' });
       expect(svg).toContain('<path d="M');
-      expect(svg).toContain('fill="#000"');
+      expect(svg).toContain('stroke=');
     });
 
-    it("'outline-round' data group contains filled paths", () => {
+    it('respects cornerStyle option', () => {
       const qr = getQr();
-      const svg = toSvg(qr, { style: 'outline-round' });
-      expect(svg).toContain('<path d="M');
-      expect(svg).toContain('fill="#000"');
-    });
-
-    it('outline respects cornerStyle option', () => {
-      const qr = getQr();
-      const svgRound = toSvg(qr, { style: 'outline', cornerStyle: 'round' });
-      // Round corners render finder circles not rects
-      expect(svgRound).toContain('<circle');
-    });
-
-    it("'outline-diagonal' produces named groups and filled paths", () => {
-      const qr = getQr();
-      const svg = toSvg(qr, { style: 'outline-diagonal' });
-      expect(svg).toContain('id="finder"');
-      expect(svg).toContain('id="data"');
-      expect(svg).toContain('<path d="M');
-    });
-
-    it("'outline-round-diagonal' produces named groups and filled paths", () => {
-      const qr = getQr();
-      const svg = toSvg(qr, { style: 'outline-round-diagonal' });
-      expect(svg).toContain('id="finder"');
-      expect(svg).toContain('id="data"');
-      expect(svg).toContain('<path d="M');
+      const svg = toSvg(qr, {
+        style: 'outline-debug',
+        cornerStyle: 'round',
+      });
+      expect(svg).toContain('<circle');
     });
   });
 });

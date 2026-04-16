@@ -11,11 +11,6 @@ export type SvgStyle =
   | 'metro'
   | 'scribble'
   | 'scribble-alt'
-  | 'outline'
-  | 'outline-round'
-  | 'outline-diagonal'
-  | 'outline-round-diagonal'
-  | 'outline-narrow'
   | 'outline-debug';
 
 export type CornerStyle = 'square' | 'rounded' | 'round';

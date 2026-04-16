@@ -3,9 +3,9 @@
  * the expected number of offset vertices and correct SVG structure
  * when run through the offset renderer.
  */
-import { trace } from '../src/svg/trace-new';
+import { trace } from '../src/svg/trace';
 import { offsetSubpath } from '../src/svg/outline';
-import type { Vertex } from '../src/svg/trace-new';
+import type { Vertex } from '../src/svg/trace';
 import { describe, it, expect } from 'vitest';
 
 const toUInt = (a: number[][]) => a.map((r) => Uint8Array.from(r));
