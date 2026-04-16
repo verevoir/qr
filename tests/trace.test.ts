@@ -327,15 +327,7 @@ describe('H pattern', () => {
 
     expect(response.dots.length).toBe(0);
     expect(response.paths).toEqual([
-      p([
-        v(0, 0),
-        v(1, 1),
-        v(2, 0),
-        v(2, 2),
-        v(2, 0),
-        v(0, 2),
-        v(0, 0),
-      ]),
+      p([v(0, 0), v(1, 1), v(2, 0), v(2, 2), v(2, 0), v(0, 2), v(0, 0)]),
     ]);
   });
 
@@ -352,27 +344,25 @@ describe('H pattern', () => {
 
     expect(response.dots.length).toBe(0);
     expect(response.paths).toEqual([
-      p(
-        [
-          v(0, 0),
-          v(0, 1),
-          v(1, 2),
-          v(3, 2),
-          v(4, 1),
-          v(4, 4),
-          v(4, 0),
-          v(4, 1),
-          v(3, 2),
-          v(1, 2),
-          v(0, 3),
-          v(0, 4),
-          v(0, 2),
-          v(0, 3),
-          v(1, 2),
-          v(0, 1),
-          v(0, 0),
-        ],
-      ),
+      p([
+        v(0, 0),
+        v(0, 1),
+        v(1, 2),
+        v(3, 2),
+        v(4, 1),
+        v(4, 4),
+        v(4, 0),
+        v(4, 1),
+        v(3, 2),
+        v(1, 2),
+        v(0, 3),
+        v(0, 4),
+        v(0, 2),
+        v(0, 3),
+        v(1, 2),
+        v(0, 1),
+        v(0, 0),
+      ]),
     ]);
   });
 });
@@ -389,19 +379,17 @@ describe('x pattern', () => {
 
     expect(response.dots.length).toBe(0);
     expect(response.paths).toEqual([
-      p(
-        [
-          v(0, 0),
-          v(1, 1),
-          v(2, 0),
-          v(1, 1),
-          v(2, 2),
-          v(1, 1),
-          v(0, 2),
-          v(1, 1),
-          v(0, 0),
-        ],
-      ),
+      p([
+        v(0, 0),
+        v(1, 1),
+        v(2, 0),
+        v(1, 1),
+        v(2, 2),
+        v(1, 1),
+        v(0, 2),
+        v(1, 1),
+        v(0, 0),
+      ]),
     ]);
   });
 
@@ -484,19 +472,17 @@ describe('holes', () => {
 
     expect(response.dots).toEqual([v(2, 0)]);
     expect(response.paths).toEqual([
-      p(
-        [
-          v(0, 0),
-          v(1, 0),
-          v(2, 1),
-          v(1, 2),
-          v(2, 2),
-          v(1, 2),
-          v(0, 1),
-          v(0, 2),
-          v(0, 0),
-        ],
-      ),
+      p([
+        v(0, 0),
+        v(1, 0),
+        v(2, 1),
+        v(1, 2),
+        v(2, 2),
+        v(1, 2),
+        v(0, 1),
+        v(0, 2),
+        v(0, 0),
+      ]),
     ]);
   });
 
@@ -513,20 +499,18 @@ describe('holes', () => {
 
     expect(response.dots).toEqual([v(4, 0)]);
     expect(response.paths).toEqual([
-      p(
-        [
-          v(0, 0),
-          v(3, 0),
-          v(4, 1),
-          v(4, 3),
-          v(3, 4),
-          v(4, 4),
-          v(1, 4),
-          v(0, 3),
-          v(0, 4),
-          v(0, 0),
-        ],
-      ),
+      p([
+        v(0, 0),
+        v(3, 0),
+        v(4, 1),
+        v(4, 3),
+        v(3, 4),
+        v(4, 4),
+        v(1, 4),
+        v(0, 3),
+        v(0, 4),
+        v(0, 0),
+      ]),
     ]);
   });
 

@@ -100,40 +100,40 @@ await downloadPng(svg, { size: 1024, filename: 'qr-code.png' });
 
 ### Options
 
-| Type          | Values                                                                                                                                                   | Default    |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `SvgStyle`    | `'square'` \| `'dots'` \| `'diamonds'` \| `'horizontal'` \| `'vertical'` \| `'diagonal'` \| `'network'` \| `'circuit'` \| `'metro'` \| `'scribble'`     | `'square'` |
-| `CornerStyle` | `'square'` \| `'rounded'`                                                                                                                                | `'square'` |
-| `LineWidth`   | `'normal'` \| `'thin'`                                                                                                                             | `'normal'` |
-| `ErrorLevel`  | `'L'` \| `'M'` \| `'Q'` \| `'H'`                                                                                                                   | `'L'`      |
+| Type          | Values                                                                                                                                              | Default    |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `SvgStyle`    | `'square'` \| `'dots'` \| `'diamonds'` \| `'horizontal'` \| `'vertical'` \| `'diagonal'` \| `'network'` \| `'circuit'` \| `'metro'` \| `'scribble'` | `'square'` |
+| `CornerStyle` | `'square'` \| `'rounded'`                                                                                                                           | `'square'` |
+| `LineWidth`   | `'normal'` \| `'thin'`                                                                                                                              | `'normal'` |
+| `ErrorLevel`  | `'L'` \| `'M'` \| `'Q'` \| `'H'`                                                                                                                    | `'L'`      |
 
 ### SVG Styles
 
-| Style       | Description                                                  |
-| ----------- | ------------------------------------------------------------ |
-| `square`    | Filled squares per module (default)                          |
-| `dots`      | Round dots — dark and light on the same layer                |
-| `diamonds`  | Diamond-shaped modules rotated 45°                           |
-| `horizontal`| Horizontal line segments                                     |
-| `vertical`  | Vertical line segments                                       |
-| `diagonal`  | Diagonal line segments                                       |
-| `network`   | Connected traced paths with diamond tips                     |
-| `circuit`   | Connected traced paths with circular tips                    |
-| `metro`     | Layered horizontal, vertical and diagonal lines              |
-| `scribble`  | Connected component walking with bezier-smoothed turns       |
+| Style        | Description                                            |
+| ------------ | ------------------------------------------------------ |
+| `square`     | Filled squares per module (default)                    |
+| `dots`       | Round dots — dark and light on the same layer          |
+| `diamonds`   | Diamond-shaped modules rotated 45°                     |
+| `horizontal` | Horizontal line segments                               |
+| `vertical`   | Vertical line segments                                 |
+| `diagonal`   | Diagonal line segments                                 |
+| `network`    | Connected traced paths with diamond tips               |
+| `circuit`    | Connected traced paths with circular tips              |
+| `metro`      | Layered horizontal, vertical and diagonal lines        |
+| `scribble`   | Connected component walking with bezier-smoothed turns |
 
 ## Architecture
 
-| File            | Responsibility                                                                                                    |
-| --------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `src/types.ts`  | Public interfaces: QrResult, SvgOptions, EncodeOptions                                                            |
-| `src/galois.ts` | GF(256) arithmetic, Reed-Solomon error correction                                                                 |
-| `src/data.ts`   | Encoding modes, data codewords, EC interleaving, version selection                                                |
-| `src/matrix.ts` | QR matrix construction, module placement, format/version info                                                     |
-| `src/mask.ts`   | Mask evaluation, penalty scoring, multi-candidate ranking                                                         |
-| `src/encode.ts` | Top-level `encode()` entry point                                                                                  |
+| File            | Responsibility                                                                                                     |
+| --------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `src/types.ts`  | Public interfaces: QrResult, SvgOptions, EncodeOptions                                                             |
+| `src/galois.ts` | GF(256) arithmetic, Reed-Solomon error correction                                                                  |
+| `src/data.ts`   | Encoding modes, data codewords, EC interleaving, version selection                                                 |
+| `src/matrix.ts` | QR matrix construction, module placement, format/version info                                                      |
+| `src/mask.ts`   | Mask evaluation, penalty scoring, multi-candidate ranking                                                          |
+| `src/encode.ts` | Top-level `encode()` entry point                                                                                   |
 | `src/svg/`      | SVG renderers (square, dots, diamonds, horizontal, vertical, diagonal, network, circuit, metro, scribble, corners) |
-| `src/png.ts`    | PNG export via browser canvas                                                                                     |
+| `src/png.ts`    | PNG export via browser canvas                                                                                      |
 
 ## Design Decisions
 

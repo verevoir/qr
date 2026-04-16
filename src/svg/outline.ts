@@ -1,6 +1,6 @@
 import type { QrMatrix } from '../types.js';
 import { trace } from './trace.js';
-import type { Trace, Vertex } from './trace.js';
+import type { Vertex } from './trace.js';
 
 // ---------------------------------------------------------------------------
 // Public API — each renderer is a self-contained function that produces
@@ -68,7 +68,13 @@ export function renderOutline(qr: QrMatrix, lineWidth = 1): string {
       const k = `${v.x},${v.y}`;
       if (seen.has(k)) return;
       seen.add(k);
-      content += cellShape('diamond', v.x + 0.5 + tx, v.y + 0.5 + ty, dotHalf, '#000');
+      content += cellShape(
+        'diamond',
+        v.x + 0.5 + tx,
+        v.y + 0.5 + ty,
+        dotHalf,
+        '#000',
+      );
     };
     // Start/close point
     if (n > 0) addDiamond(verts[0]);
@@ -80,7 +86,13 @@ export function renderOutline(qr: QrMatrix, lineWidth = 1): string {
     }
   }
   for (const dot of traced.dots) {
-    content += cellShape('diamond', dot.x + 0.5 + tx, dot.y + 0.5 + ty, dotHalf, '#000');
+    content += cellShape(
+      'diamond',
+      dot.x + 0.5 + tx,
+      dot.y + 0.5 + ty,
+      dotHalf,
+      '#000',
+    );
   }
 
   return content + alignmentOverlay(qr);
@@ -241,31 +253,6 @@ function buildDataGrid(qr: QrMatrix): Uint8Array[] {
   return grid;
 }
 
-// ---------------------------------------------------------------------------
-// Offset renderer internals
-// ---------------------------------------------------------------------------
-
-function renderTraceOffset(traced: Trace, tx: number, ty: number): string {
-  const halfWidth = 0.5;
-  let d = '';
-
-  for (const path of traced.paths) {
-    d += offsetSubpath(path.vertices, halfWidth, tx, ty);
-    for (const hole of path.holeVertices) {
-      d += offsetSubpath(hole, halfWidth, tx, ty, true);
-    }
-    for (const dot of path.dots) {
-      d += diamondSubpath(dot.x + 0.5, dot.y + 0.5, halfWidth, tx, ty);
-    }
-  }
-  for (const dot of traced.dots) {
-    d += diamondSubpath(dot.x + 0.5, dot.y + 0.5, halfWidth, tx, ty);
-  }
-  return d
-    ? `<path d="${d}" fill="#000" fill-rule="nonzero"/>`
-    : '';
-}
-
 export function offsetSubpath(
   verts: readonly Vertex[],
   halfWidth: number,
@@ -317,8 +304,8 @@ export function offsetSubpath(
         points.push({ x: cx + halfWidth * sx, y: cy + halfWidth * sy });
       } else {
         points.push({
-          x: cx + halfWidth * (p1x + p2x) / 2,
-          y: cy + halfWidth * (p1y + p2y) / 2,
+          x: cx + (halfWidth * (p1x + p2x)) / 2,
+          y: cy + (halfWidth * (p1y + p2y)) / 2,
         });
       }
     }
@@ -336,23 +323,6 @@ export function offsetSubpath(
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
-
-function diamondSubpath(
-  cx: number,
-  cy: number,
-  half: number,
-  tx: number,
-  ty: number,
-): string {
-  const x = cx + tx;
-  const y = cy + ty;
-  return (
-    `M${fmt(x)},${fmt(y - half)}` +
-    `L${fmt(x + half)},${fmt(y)}` +
-    `L${fmt(x)},${fmt(y + half)}` +
-    `L${fmt(x - half)},${fmt(y)}Z`
-  );
-}
 
 function polyline(
   verts: readonly Vertex[],
