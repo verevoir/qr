@@ -1,86 +1,78 @@
 # @verevoir/qr
 
-Text to QR code in TypeScript. Ten SVG styles, zero dependencies.
-
-## Styles
-
-There are a number of style variations but these are some examples.
-| squares | dots<br />(photo overlay) | horizontal | diagonal | metro |
-| --- | --- | --- | --- | --- |
-| <img src="docs/style-square.svg" width="130" alt="Square style"> | <img src="docs/style-dots.svg" width="130" alt="Square style"> | <img src="docs/style-horizontal.svg" width="130" alt="Horizontal style"> | <img src="docs/style-diagonal.svg" width="130" alt="Square style"> | <img src="docs/style-metro.svg" width="130" alt="Square style"> |
-
-## What It Does
-
-- **Encode** — text in, QR matrix out. Versions 1–40, all four error correction levels, auto mode selection.
-- **Multiple masks** — gives you several mask variants ranked by quality, so you pick the one that looks best for your use case.
-- **SVG rendering** — ten styles, two corner shapes, two line weights. Most styles output closed paths directly.
-- **PNG export** — `svgToPng()` and `downloadPng()` for browser use. No server needed.
-
-## Install
+Text to QR code in TypeScript. Ten SVG styles, two corner treatments, PNG export. Zero dependencies.
 
 ```bash
 npm install @verevoir/qr
 ```
 
-## Quick Example
+## Styles
+
+Eight hundred words of spec is one picture:
+
+| squares | dots | horizontal | diagonal | metro |
+| --- | --- | --- | --- | --- |
+| <img src="docs/style-square.svg" width="130" alt="Square"> | <img src="docs/style-dots.svg" width="130" alt="Dots"> | <img src="docs/style-horizontal.svg" width="130" alt="Horizontal"> | <img src="docs/style-diagonal.svg" width="130" alt="Diagonal"> | <img src="docs/style-metro.svg" width="130" alt="Metro"> |
+
+Plus diamonds, vertical, network, circuit, and scribble. Same data, different visual treatment; any of them scans.
+
+## Quick start
 
 ```typescript
 import { encode, toSvg } from '@verevoir/qr';
 
-// Encode text — returns multiple mask candidates
 const results = encode('https://example.com');
+const svg = toSvg(results[0], { style: 'dots', cornerStyle: 'rounded' });
 
-// Render the first candidate as SVG
-const svg = toSvg(results[0], {
-  style: 'dots',
-  cornerStyle: 'rounded',
-});
-
-// svg is a complete SVG string — write to file, set as innerHTML, etc.
+// svg is a complete SVG string — set as innerHTML, write to disk,
+// drop in a React component, whatever.
 ```
 
-### Choosing a Style
+`encode` returns an array of mask candidates ranked by visual quality. Most libraries pick one for you; this one lets you pick — what looks best depends on the style you're rendering with.
+
+## Why it exists
+
+- **Zero dependencies.** GF(256) arithmetic, Reed-Solomon error correction, mask evaluation, SVG rendering — all self-contained TypeScript.
+- **Ten built-in styles.** Most libraries ship one (filled squares). The scanning-reliable variations — dots, diamonds, traced networks, bezier scribbles — let you design instead of settle.
+- **SVG out by default.** QR codes are grids; vectors scale perfectly and work in any CAD / fabrication tool. PNG export is there when you need pixels.
+- **Outline tracing.** The `square` and grid-based styles trace connected regions as single paths rather than thousands of rectangles. Smaller files, cleaner output.
+- **Layer separation.** The `dots` renderer outputs dark and light modules as separate `<g>` groups — useful for multi-colour prints and laser cutting.
+
+## Picking a style
 
 ```typescript
 import { encode, toSvg } from '@verevoir/qr';
 import type { SvgStyle } from '@verevoir/qr';
 
-const results = encode('https://example.com');
-const qr = results[0];
+const qr = encode('https://verevoir.io')[0];
 
-// All ten styles from the same QR data
 const styles: SvgStyle[] = [
-  'square',
-  'dots',
-  'diamonds',
-  'horizontal',
-  'vertical',
-  'diagonal',
-  'network',
-  'circuit',
-  'metro',
-  'scribble',
+  'square', 'dots', 'diamonds',
+  'horizontal', 'vertical', 'diagonal',
+  'network', 'circuit', 'metro', 'scribble',
 ];
 
 for (const style of styles) {
   const svg = toSvg(qr, { style, cornerStyle: 'rounded' });
-  // Each produces a distinct visual treatment of the same data
+  // Distinct visual treatment of the same data
 }
 ```
 
-### PNG Export (Browser)
+## PNG (browser)
 
 ```typescript
 import { encode, toSvg, svgToPng, downloadPng } from '@verevoir/qr';
 
 const svg = toSvg(encode('https://example.com')[0], { style: 'square' });
 
-// Get a PNG blob
+// As a blob
 const blob = await svgToPng(svg, { size: 1024 });
 
-// Or trigger a file download directly
+// Or trigger a download
 await downloadPng(svg, { size: 1024, filename: 'qr-code.png' });
 ```
+
+Browser-only — uses the native canvas API, no `canvas` package required.
 
 ## API
 
@@ -107,7 +99,7 @@ await downloadPng(svg, { size: 1024, filename: 'qr-code.png' });
 | `LineWidth`   | `'normal'` \| `'thin'`                                                                                                                              | `'normal'` |
 | `ErrorLevel`  | `'L'` \| `'M'` \| `'Q'` \| `'H'`                                                                                                                    | `'L'`      |
 
-### SVG Styles
+### SVG styles
 
 | Style        | Description                                            |
 | ------------ | ------------------------------------------------------ |
@@ -122,40 +114,18 @@ await downloadPng(svg, { size: 1024, filename: 'qr-code.png' });
 | `metro`      | Layered horizontal, vertical and diagonal lines        |
 | `scribble`   | Connected component walking with bezier-smoothed turns |
 
-## Architecture
+## Coming from `node-qrcode`?
 
-| File            | Responsibility                                                                                                     |
-| --------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `src/types.ts`  | Public interfaces: QrResult, SvgOptions, EncodeOptions                                                             |
-| `src/galois.ts` | GF(256) arithmetic, Reed-Solomon error correction                                                                  |
-| `src/data.ts`   | Encoding modes, data codewords, EC interleaving, version selection                                                 |
-| `src/matrix.ts` | QR matrix construction, module placement, format/version info                                                      |
-| `src/mask.ts`   | Mask evaluation, penalty scoring, multi-candidate ranking                                                          |
-| `src/encode.ts` | Top-level `encode()` entry point                                                                                   |
-| `src/svg/`      | SVG renderers (square, dots, diamonds, horizontal, vertical, diagonal, network, circuit, metro, scribble, corners) |
-| `src/png.ts`    | PNG export via browser canvas                                                                                      |
+[`@verevoir/qrcode`](https://www.npmjs.com/package/@verevoir/qrcode) is an API-compatible wrapper. Same method names (`toString`, `toFile`, `toBuffer`, `toCanvas`, `toDataURL`), so existing call sites migrate without code rewrites — you just change the import. Use `@verevoir/qr` directly when you want the full control; use `@verevoir/qrcode` when you're swapping in behind existing code.
 
-## Design Decisions
+## Part of Verevoir
 
-- **Multiple masks, not just one.** Most QR libraries pick the "best" mask for you. This one gives you all the good options — what looks best depends on the style and context.
-- **SVG only.** QR codes are grids — vectors scale perfectly. No bitmap rendering built in (use the browser PNG export if you need pixels).
-- **Outline tracing.** The square and grid styles trace connected regions as single paths rather than individual rectangles. Cleaner SVG, works in CAD tools without conversion.
-- **Layer separation.** The dots renderer outputs dark and light as separate `<g id="dark">` / `<g id="light">` groups.
-- **No dependencies.** Everything — GF(256) maths, Reed-Solomon, rendering — is self-contained TypeScript.
+`@verevoir/qr` is standalone — zero Verevoir dependencies, fine as a single-purpose library. It's also the QR engine behind [Verevoir's](https://verevoir.io) hosted shortener/tracker and the [Slinqi](https://slinqi.io) service. If you need link tracking or URL shortening alongside, [`@verevoir/link-tracking`](https://www.npmjs.com/package/@verevoir/link-tracking) composes with this.
 
 ## Acknowledgements
 
 The encoding engine was built with the help of Massimo Artizzu's excellent ["Let's Develop a QR Code Generator"](https://dev.to/maxart2501/let-s-develop-a-qr-code-generator-part-i-basic-concepts-510a) series on Dev.to, which walks through the QR specification from first principles.
 
-## Documentation
+## License
 
-- [QR & Link Tracking](https://verevoir.io/docs/qr) — encoding, rendering, link tracking, and integration patterns
-
-## Development
-
-```bash
-npm install    # Install dependencies
-make build     # Compile TypeScript
-make test      # Run test suite
-make lint      # Check formatting
-```
+MIT
