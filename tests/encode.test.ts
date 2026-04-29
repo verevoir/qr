@@ -117,4 +117,44 @@ describe('encode', () => {
     const results = encode('');
     expect(results.length).toBeGreaterThan(0);
   });
+
+  describe('logoArea', () => {
+    it('forces H-level error correction', () => {
+      const [result] = encode('https://example.com', { logoArea: 0.15 });
+      expect(result.errorLevel).toBe('H');
+    });
+
+    it('bumps the version to leave logo-sized headroom', () => {
+      const text = 'https://example.com/some/reasonable/path';
+      const [plain] = encode(text, { boostErrorCorrection: true });
+      const [withLogo] = encode(text, { logoArea: 0.2 });
+      expect(withLogo.version).toBeGreaterThan(plain.version);
+    });
+
+    it('is a no-op when set to 0', () => {
+      const [withZero] = encode('HELLO', { logoArea: 0 });
+      const [plain] = encode('HELLO');
+      expect(withZero.version).toBe(plain.version);
+      expect(withZero.errorLevel).toBe(plain.errorLevel);
+    });
+
+    it('throws for negative logoArea', () => {
+      expect(() => encode('HELLO', { logoArea: -0.1 })).toThrow(
+        /logoArea must be in/,
+      );
+    });
+
+    it('throws for logoArea >= 1', () => {
+      expect(() => encode('HELLO', { logoArea: 1 })).toThrow(
+        /logoArea must be in/,
+      );
+    });
+
+    it('throws when the reserved area leaves no room for the data', () => {
+      const huge = 'A'.repeat(1800);
+      expect(() => encode(huge, { logoArea: 0.25 })).toThrow(
+        'content is too large',
+      );
+    });
+  });
 });

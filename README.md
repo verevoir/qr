@@ -1,6 +1,6 @@
 # @verevoir/qr
 
-Text to QR code in TypeScript. Ten SVG styles, two corner treatments, PNG export. Zero dependencies.
+Text to QR code in TypeScript. Twelve SVG styles — including two that sample a source image for photo and logo overlays — two corner treatments, PNG export. Zero dependencies.
 
 ```bash
 npm install @verevoir/qr
@@ -15,6 +15,11 @@ Eight hundred words of spec is one picture:
 | <img src="docs/style-square.svg" width="130" alt="Square"> | <img src="docs/style-dots.svg" width="130" alt="Dots"> | <img src="docs/style-horizontal.svg" width="130" alt="Horizontal"> | <img src="docs/style-diagonal.svg" width="130" alt="Diagonal"> | <img src="docs/style-metro.svg" width="130" alt="Metro"> |
 
 Plus diamonds, vertical, network, circuit, and scribble. Same data, different visual treatment; any of them scans.
+
+Two image-driven styles round it out:
+
+- **`photo`** — dot-density modulates from a source image. Dark regions get big dark dots, light regions get small ones; light modules in dark regions render as a dark ring with a small light centre so the decoder still sees them. The image emerges from the dot pattern itself — no background image needed in the output.
+- **`logo`** — sparse dots overlaid on a composited source image. Each module is rendered only where the image can't carry the contrast on its own, using the ISO/IEC 15415 reflectance bands as thresholds. You place the image in the DOM behind the SVG; the QR adds the minimum necessary ink on top.
 
 ## Quick start
 
@@ -33,7 +38,7 @@ const svg = toSvg(results[0], { style: 'dots', cornerStyle: 'rounded' });
 ## Why it exists
 
 - **Zero dependencies.** GF(256) arithmetic, Reed-Solomon error correction, mask evaluation, SVG rendering — all self-contained TypeScript.
-- **Ten built-in styles.** Most libraries ship one (filled squares). The scanning-reliable variations — dots, diamonds, traced networks, bezier scribbles — let you design instead of settle.
+- **Twelve built-in styles.** Most libraries ship one (filled squares). Scanning-reliable variations — dots, diamonds, traced networks, bezier scribbles, plus two image-driven styles (`photo`, `logo`) — let you design instead of settle.
 - **SVG out by default.** QR codes are grids; vectors scale perfectly and work in any CAD / fabrication tool. PNG export is there when you need pixels.
 - **Outline tracing.** The `square` and grid-based styles trace connected regions as single paths rather than thousands of rectangles. Smaller files, cleaner output.
 - **Layer separation.** The `dots` renderer outputs dark and light modules as separate `<g>` groups — useful for multi-colour prints and laser cutting.
@@ -50,6 +55,8 @@ const styles: SvgStyle[] = [
   'square', 'dots', 'diamonds',
   'horizontal', 'vertical', 'diagonal',
   'network', 'circuit', 'metro', 'scribble',
+  // Image-driven — each requires a PhotoSampler:
+  'photo', 'logo',
 ];
 
 for (const style of styles) {
@@ -94,7 +101,7 @@ Browser-only — uses the native canvas API, no `canvas` package required.
 
 | Type          | Values                                                                                                                                              | Default    |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `SvgStyle`    | `'square'` \| `'dots'` \| `'diamonds'` \| `'horizontal'` \| `'vertical'` \| `'diagonal'` \| `'network'` \| `'circuit'` \| `'metro'` \| `'scribble'` | `'square'` |
+| `SvgStyle`    | `'square'` \| `'dots'` \| `'diamonds'` \| `'horizontal'` \| `'vertical'` \| `'diagonal'` \| `'network'` \| `'circuit'` \| `'metro'` \| `'scribble'` \| `'photo'` \| `'logo'` | `'square'` |
 | `CornerStyle` | `'square'` \| `'rounded'`                                                                                                                           | `'square'` |
 | `LineWidth`   | `'normal'` \| `'thin'`                                                                                                                              | `'normal'` |
 | `ErrorLevel`  | `'L'` \| `'M'` \| `'Q'` \| `'H'`                                                                                                                    | `'L'`      |
@@ -113,6 +120,45 @@ Browser-only — uses the native canvas API, no `canvas` package required.
 | `circuit`    | Connected traced paths with circular tips              |
 | `metro`      | Layered horizontal, vertical and diagonal lines        |
 | `scribble`   | Connected component walking with bezier-smoothed turns |
+| `photo`      | Dot-density modulates from an image sampler. Dark-dot diameter tracks local darkness; light modules in dark regions render as a dark ring with a small light centre. Requires `photo: { sample }`. |
+| `logo`       | Sparse dots overlaid on a composited source image. Two-threshold cull per ISO/IEC 15415 — `lum < 0.4` / `lum > 0.7` by default. Requires `logo: { sample }`. |
+
+### Image-driven styles
+
+`photo` and `logo` take a curried `PhotoSampler`:
+
+```typescript
+import { encode, toSvg } from '@verevoir/qr';
+import { imageToSampler } from '@verevoir/qr/web';
+
+const img = new Image();
+img.src = '/portrait.jpg';
+await img.decode();
+
+const [qr] = encode('https://example.com', { boostErrorCorrection: true });
+const svg = toSvg(qr, {
+  style: 'photo',
+  photo: { sample: imageToSampler(img) },
+});
+```
+
+`imageToSampler` takes any `CanvasImageSource` — `HTMLImageElement`, `HTMLCanvasElement`, `ImageBitmap`, `SVGImageElement`, etc. — rasterises it at the QR's module resolution (aspect-preserving letterbox on white), and returns a sampler the renderer consumes. The core library stays DOM-free; Node consumers can write their own sampler around `sharp`, `node-canvas`, or any other source.
+
+For `logo`, composite the source image behind the SVG yourself (DOM layering, or an `<image>` tag inside a wrapping SVG). The QR only emits the dots that are strictly needed; the underlying image carries the rest.
+
+Neither style is surfaced through the `@verevoir/qrcode` shim — the `node-qrcode` API has no way to pass a sampler callback.
+
+### Reserving space for a logo
+
+If you want to cover the centre of a QR with a logo image (any style, not just `logo`), pass `logoArea` to `encode`. The encoder forces H-level error correction and picks a version large enough that the covered area fits inside the recovery budget:
+
+```typescript
+const [qr] = encode('https://example.com', { logoArea: 0.15 });
+const svg = toSvg(qr, { style: 'square' });
+// Composite a 15%-area logo over the centre of the rendered SVG.
+```
+
+Recommended range `0.05`–`0.25`. Values above ~0.30 exceed H's practical recovery and will usually fail to scan. If the data is too large for any version at the requested ratio, `encode` throws `"content is too large"`.
 
 ## Coming from `node-qrcode`?
 

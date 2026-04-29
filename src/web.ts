@@ -15,6 +15,77 @@
 export { svgToPng, downloadPng } from './png.js';
 export type { PngOptions } from './png.js';
 
+import type { PhotoSampler } from './types.js';
+
+/**
+ * Build a `PhotoSampler` from any source the browser can draw to a
+ * canvas — `HTMLImageElement`, `SVGImageElement`, `HTMLCanvasElement`,
+ * `ImageBitmap`, or a `CanvasImageSource` in general. The source must
+ * already be loaded (e.g. `await img.decode()` on an `HTMLImageElement`).
+ *
+ * The returned sampler rasterises once per call to `toSvg`, at the QR's
+ * module resolution, letterboxing the source so its aspect ratio is
+ * preserved. Each cell reads back the Rec. 709 luminance of the rendered
+ * pixel.
+ */
+export function imageToSampler(source: CanvasImageSource): PhotoSampler {
+  if (typeof document === 'undefined') {
+    throw new Error('imageToSampler: requires a browser environment');
+  }
+  return (size: number) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('imageToSampler: failed to acquire 2D canvas context');
+    }
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, size, size);
+
+    const srcW = sourceWidth(source);
+    const srcH = sourceHeight(source);
+    const scale = Math.min(size / srcW, size / srcH);
+    const drawW = srcW * scale;
+    const drawH = srcH * scale;
+    const dx = (size - drawW) / 2;
+    const dy = (size - drawH) / 2;
+    ctx.drawImage(source, dx, dy, drawW, drawH);
+
+    const data = ctx.getImageData(0, 0, size, size).data;
+    return (row: number, col: number) => {
+      const i = (row * size + col) * 4;
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      // Rec. 709 luminance, normalised to [0, 1].
+      const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      return { luminance };
+    };
+  };
+}
+
+function sourceWidth(source: CanvasImageSource): number {
+  if ('naturalWidth' in source && source.naturalWidth) return source.naturalWidth;
+  if ('videoWidth' in source && source.videoWidth) return source.videoWidth;
+  if ('width' in source) {
+    const w = source.width;
+    return typeof w === 'number' ? w : w.baseVal.value;
+  }
+  throw new Error('imageToSampler: could not determine source width');
+}
+
+function sourceHeight(source: CanvasImageSource): number {
+  if ('naturalHeight' in source && source.naturalHeight)
+    return source.naturalHeight;
+  if ('videoHeight' in source && source.videoHeight) return source.videoHeight;
+  if ('height' in source) {
+    const h = source.height;
+    return typeof h === 'number' ? h : h.baseVal.value;
+  }
+  throw new Error('imageToSampler: could not determine source height');
+}
+
 /**
  * Parse an SVG string into a live `SVGSVGElement` the caller can
  * insert into the DOM or manipulate further. Uses `DOMParser`.

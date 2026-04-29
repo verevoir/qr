@@ -13,6 +13,7 @@ import { renderDiagonal } from './diagonal.js';
 import { renderCells, renderOutline, renderCircuit } from './outline.js';
 import { renderTubemap } from './tubemap.js';
 import { renderScribble } from './scribble.js';
+import { renderPhoto, renderLogo } from './photo.js';
 
 export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
   const style: SvgStyle = options?.style ?? 'square';
@@ -56,6 +57,18 @@ export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
       break;
     case 'scribble':
       content += renderScribble(qr, lineWidth);
+      break;
+    case 'photo':
+      if (!options?.photo) {
+        throw new Error("toSvg: style 'photo' requires a `photo` option");
+      }
+      content += renderPhoto(qr, options.photo);
+      break;
+    case 'logo':
+      if (!options?.logo) {
+        throw new Error("toSvg: style 'logo' requires a `logo` option");
+      }
+      content += renderLogo(qr, dotSize, options.logo);
       break;
     default:
       content += renderCells(qr, 'square', dotSize);

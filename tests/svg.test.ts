@@ -73,6 +73,145 @@ describe('toSvg', () => {
     'scribble',
   ];
 
+  describe('photo style', () => {
+    function uniformSampler(value: number) {
+      return () => () => ({ luminance: value });
+    }
+
+    it('throws when photo option is missing', () => {
+      const qr = getQr();
+      expect(() => toSvg(qr, { style: 'photo' })).toThrow(/requires.*photo/);
+    });
+
+    it('uniform dark luminance produces max-size dark dots', () => {
+      const qr = getQr();
+      const svg = toSvg(qr, {
+        style: 'photo',
+        photo: { sample: uniformSampler(0) },
+      });
+      // Dark modules render at max size.
+      expect(svg).toContain('stroke="#000" stroke-width="0.9"');
+      // No shrunken dark dots.
+      expect(svg).not.toContain('stroke="#000" stroke-width="0.25"');
+    });
+
+    it('uniform dark luminance wraps light modules with dark ring + light centre', () => {
+      const qr = getQr();
+      const svg = toSvg(qr, {
+        style: 'photo',
+        photo: { sample: uniformSampler(0) },
+      });
+      // Light modules in dark regions get a small light centre for the
+      // decoder to sample, inside a big dark ring.
+      expect(svg).toContain('stroke="#fff" stroke-width="0.25"');
+    });
+
+    it('uniform light luminance produces min-size dark dots and no light rings', () => {
+      const qr = getQr();
+      const svg = toSvg(qr, {
+        style: 'photo',
+        photo: { sample: uniformSampler(1) },
+      });
+      expect(svg).toContain('stroke="#000" stroke-width="0.25"');
+      expect(svg).not.toContain('stroke="#000" stroke-width="0.9"');
+      // Light modules in light regions are skipped entirely.
+      expect(svg).not.toContain('stroke="#fff"');
+    });
+
+    it('honours custom min/max dot sizes', () => {
+      const qr = getQr();
+      const svg = toSvg(qr, {
+        style: 'photo',
+        photo: {
+          sample: uniformSampler(1),
+          minDotSize: 0.4,
+          maxDotSize: 0.8,
+        },
+      });
+      expect(svg).toContain('stroke-width="0.4"');
+    });
+
+    it('still emits finder corners at full size', () => {
+      const qr = getQr();
+      const svg = toSvg(qr, {
+        style: 'photo',
+        photo: { sample: uniformSampler(1) },
+      });
+      expect(svg).toContain('<rect x="1" y="1" width="7" height="7"');
+    });
+  });
+
+  describe('logo style', () => {
+    function uniformSampler(value: number) {
+      return () => () => ({ luminance: value });
+    }
+
+    it('throws when logo option is missing', () => {
+      const qr = getQr();
+      expect(() => toSvg(qr, { style: 'logo' })).toThrow(/requires.*logo/);
+    });
+
+    it('decisively dark image culls dark modules, keeps light dots', () => {
+      const qr = getQr();
+      const svg = toSvg(qr, {
+        style: 'logo',
+        logo: { sample: uniformSampler(0) },
+      });
+      // lum=0 < darkBelow=0.4 → dark modules skipped.
+      // lum=0 is not > lightAbove=0.7 → light modules still rendered.
+      expect(svg).not.toContain('stroke="#000"');
+      expect(svg).toContain('stroke="#fff"');
+    });
+
+    it('decisively light image culls light modules, keeps dark dots', () => {
+      const qr = getQr();
+      const svg = toSvg(qr, {
+        style: 'logo',
+        logo: { sample: uniformSampler(1) },
+      });
+      expect(svg).toContain('stroke="#000"');
+      expect(svg).not.toContain('stroke="#fff"');
+    });
+
+    it('mushy midtone renders every module (neither side confident)', () => {
+      const qr = getQr();
+      const svg = toSvg(qr, {
+        style: 'logo',
+        logo: { sample: uniformSampler(0.55) },
+      });
+      // 0.55 is in the [0.4, 0.7] uncertain band — both colours emit.
+      expect(svg).toContain('stroke="#000"');
+      expect(svg).toContain('stroke="#fff"');
+    });
+
+    it('honours custom thresholds', () => {
+      const qr = getQr();
+      // lum=0.3 would normally cull dark modules (0.3 < 0.4). With
+      // darkBelow=0.2 it no longer does.
+      const svg = toSvg(qr, {
+        style: 'logo',
+        logo: { sample: uniformSampler(0.3), darkBelow: 0.2 },
+      });
+      expect(svg).toContain('stroke="#000"');
+    });
+
+    it('leaves finder corners intact', () => {
+      const qr = getQr();
+      const svg = toSvg(qr, {
+        style: 'logo',
+        logo: { sample: uniformSampler(0) },
+      });
+      expect(svg).toContain('<rect x="1" y="1" width="7" height="7"');
+    });
+
+    it('baseline dots style is unchanged', () => {
+      const qr = getQr();
+      const svg = toSvg(qr, { style: 'dots' });
+      expect(svg).toContain('fill="#000"');
+      expect(svg).toContain('fill="#fff"');
+    });
+  });
+
   for (const style of styles) {
     it(`renders ${style} style without error`, () => {
       const qr = getQr();

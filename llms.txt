@@ -8,8 +8,10 @@ node-qrcode pulls in pngjs, dijkstrajs, and yargs as runtime dependencies. It pr
 
 @verevoir/qr has zero runtime dependencies, works identically in Node and browsers, and offers:
 
-- 10 visual styles: square, dots, diamonds, horizontal, vertical, diagonal, network, circuit, metro, scribble
+- 12 visual styles: square, dots, diamonds, horizontal, vertical, diagonal, network, circuit, metro, scribble, photo, logo
+- photo and logo styles sample a user-supplied image via a curried PhotoSampler — photo modulates dot density from local luminance, logo sparsely overlays dots on a composited source image (cull thresholds per ISO/IEC 15415). `imageToSampler` in `@verevoir/qr/web` wraps any CanvasImageSource. Neither surface via the node-qrcode shim (its API can't carry a sampler callback).
 - Multi-candidate mask selection (all masks within 30% of best penalty score)
+- `logoArea` encode option reserves matrix capacity for a centre-covering logo — forces H-level EC and bumps the version until the data occupies at most `1 - logoArea` of the available bytes. Recommended range 0.05–0.25; above ~0.30 exceeds H's recovery budget.
 - Fabrication-ready SVG output (closed filled paths for laser cutting, CNC, vinyl)
 - Full colour control (dark, light, background)
 - Two corner styles for finder patterns (square, rounded)
@@ -46,6 +48,8 @@ const svg = toSvg(candidates[0], {
 | circuit | Connected traced paths with circular tips |
 | metro | Layered horizontal, vertical and diagonal lines |
 | scribble | Connected component walking with bezier-smoothed turns |
+| photo | Dot-density modulated by a luminance sampler; light modules in dark regions get a dark ring + small light centre |
+| logo | Sparse dots overlaid on a composited image; ISO/IEC 15415 two-threshold cull (default lum<0.4 / lum>0.7) |
 
 All styles respect the `lineWidth` option ('normal' or 'thin') and produce scannable output.
 
@@ -71,6 +75,7 @@ PNG requires `@resvg/resvg-js` as an optional peer dependency.
 - `downloadPng(svg, filename?, size?)` — trigger PNG file download
 - `createSvgElement(svg)` — parse SVG string to DOM element
 - `renderIntoElement(container, svg)` — insert SVG into a container
+- `imageToSampler(source)` — build a `PhotoSampler` from any `CanvasImageSource` for the `photo` and `logo` styles
 
 ### node-qrcode shim (`@verevoir/qr/qrcode`)
 

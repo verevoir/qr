@@ -297,11 +297,16 @@ export interface CodewordResult {
 export function getCodewords(
   content: string,
   minErrorLevel = 'L',
+  reservedCapacityRatio = 0,
 ): CodewordResult {
   const encodingMode = getEncodingMode(content);
+  const targetLength =
+    reservedCapacityRatio > 0
+      ? Math.ceil(content.length / (1 - reservedCapacityRatio))
+      : content.length;
   const [version, errorLevel] = getVersionAndErrorLevel(
     encodingMode,
-    content.length,
+    targetLength,
     minErrorLevel,
   );
   const lengthBits = getLengthBits(encodingMode, version);

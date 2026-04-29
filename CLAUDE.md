@@ -4,9 +4,9 @@ QR code encoding engine and SVG renderers. Turns text into scannable QR codes wi
 
 ## What It Does
 
-- **Encode** — text to QR matrix. Supports versions 1-40, error correction levels L/M/Q/H, numeric/alphanumeric/byte encoding modes.
+- **Encode** — text to QR matrix. Supports versions 1-40, error correction levels L/M/Q/H, numeric/alphanumeric/byte encoding modes. `logoArea` option reserves capacity for a centre-covering logo (forces H, bumps the version).
 - **Multi-candidate** — returns multiple mask variants above a quality threshold (default: within 30% of best penalty score) so consumers can pick aesthetically.
-- **SVG rendering** — ten visual styles, two corner styles, line width options, optional layer separation for 3D printing/laser cutting.
+- **SVG rendering** — twelve visual styles, two corner styles, line width options, optional layer separation for 3D printing/laser cutting.
 - **PNG export** — browser-only `svgToPng()` renders SVG to PNG via canvas. `downloadPng()` convenience helper triggers a file download. Zero dependencies — uses native browser APIs.
 
 ## SVG Styles
@@ -23,6 +23,12 @@ QR code encoding engine and SVG renderers. Turns text into scannable QR codes wi
 | `circuit`    | Connected traced paths with circular tips              |
 | `metro`      | Layered horizontal, vertical and diagonal lines        |
 | `scribble`   | Connected component walking with bezier-smoothed turns |
+| `photo`      | Dot-density modulation from an image sampler — dark-dot size tracks local darkness; light modules in dark regions render as a dark ring with a light centre |
+| `logo`      | Sparse dots overlaid on a composited source image — modules cull where image luminance already provides correct contrast (two-threshold rule, `lum < 0.4` / `lum > 0.7` by default, per ISO/IEC 15415) |
+
+`photo` and `logo` require a `PhotoSampler` — a curried callback `(size) => (row, col) => { luminance, color? }`. Core library is DOM-free; `imageToSampler` in `@verevoir/qr/web` wraps any `CanvasImageSource` into a sampler. Neither style is surfaced by the `node-qrcode` shim — its API can't carry a sampler callback.
+
+Fabrication note: `metro`, `photo`, and `logo` are the only styles that can't go directly to single-path fabrication without further processing (overlapping shapes, rings, modulation bands).
 
 ## Corner Styles
 
@@ -48,7 +54,7 @@ npm install
 - `src/matrix.ts` — QR matrix construction, module placement, format/version info
 - `src/mask.ts` — mask evaluation, penalty scoring, multi-candidate ranking
 - `src/encode.ts` — top-level `encode()` entry point
-- `src/svg/` — SVG renderers (square, dots, diamonds, horizontal, vertical, diagonal, network, circuit, metro, scribble, corners)
+- `src/svg/` — SVG renderers (square, dots, diamonds, horizontal, vertical, diagonal, network, circuit, metro, scribble, photo, logo, corners)
 - `src/png.ts` — PNG export via browser canvas (`svgToPng`, `downloadPng`)
 - `src/types.ts` — public type definitions
 
