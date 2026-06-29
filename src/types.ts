@@ -69,6 +69,13 @@ export interface PhotoOptions {
    * regular `dots` style at full size.
    */
   maxDotSize?: number;
+  /**
+   * Light modules are culled when the sample luminance is decisively
+   * light — above this threshold. Without the cull, the small white
+   * centre dots would render over already-light image regions and
+   * clutter the look. Default `0.7`, mirroring `LogoOptions`.
+   */
+  lightAbove?: number;
 }
 
 export interface LogoOptions {

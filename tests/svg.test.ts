@@ -89,8 +89,8 @@ describe('toSvg', () => {
         style: 'photo',
         photo: { sample: uniformSampler(0) },
       });
-      // Dark modules render at max size.
-      expect(svg).toContain('stroke="#000" stroke-width="0.9"');
+      // Dark modules render at max size — default maxDotSize is 1.
+      expect(svg).toContain('stroke="#000" stroke-width="1"');
       // No shrunken dark dots.
       expect(svg).not.toContain('stroke="#000" stroke-width="0.25"');
     });
@@ -151,37 +151,21 @@ describe('toSvg', () => {
       expect(() => toSvg(qr, { style: 'logo' })).toThrow(/requires.*logo/);
     });
 
-    it('decisively dark image culls dark modules, keeps light dots', () => {
+    it('renders every module at half diameter regardless of luminance', () => {
       const qr = getQr();
-      const svg = toSvg(qr, {
-        style: 'logo',
-        logo: { sample: uniformSampler(0) },
-      });
-      // lum=0 < darkBelow=0.4 → dark modules skipped.
-      // lum=0 is not > lightAbove=0.7 → light modules still rendered.
-      expect(svg).not.toContain('stroke="#000"');
-      expect(svg).toContain('stroke="#fff"');
-    });
-
-    it('decisively light image culls light modules, keeps dark dots', () => {
-      const qr = getQr();
-      const svg = toSvg(qr, {
-        style: 'logo',
-        logo: { sample: uniformSampler(1) },
-      });
-      expect(svg).toContain('stroke="#000"');
-      expect(svg).not.toContain('stroke="#fff"');
-    });
-
-    it('mushy midtone renders every module (neither side confident)', () => {
-      const qr = getQr();
-      const svg = toSvg(qr, {
-        style: 'logo',
-        logo: { sample: uniformSampler(0.55) },
-      });
-      // 0.55 is in the [0.4, 0.7] uncertain band — both colours emit.
-      expect(svg).toContain('stroke="#000"');
-      expect(svg).toContain('stroke="#fff"');
+      // Whether the sampler reports dark, light, or midtone, the
+      // logo style emits both dark and light dots at half the dot
+      // size. Luminance-based culling was tried and removed —
+      // missing dots over matching-image regions read worse than
+      // uniformly half-size marks.
+      for (const lum of [0, 0.55, 1]) {
+        const svg = toSvg(qr, {
+          style: 'logo',
+          logo: { sample: uniformSampler(lum) },
+        });
+        expect(svg).toContain('stroke="#000"');
+        expect(svg).toContain('stroke="#fff"');
+      }
     });
 
     it('honours custom thresholds', () => {

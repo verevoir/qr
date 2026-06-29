@@ -299,21 +299,29 @@ export function getCodewords(
   minErrorLevel = 'L',
   reservedCapacityRatio = 0,
 ): CodewordResult {
-  const encodingMode = getEncodingMode(content);
-  const targetLength =
-    reservedCapacityRatio > 0
-      ? Math.ceil(content.length / (1 - reservedCapacityRatio))
-      : content.length;
-  const [version, errorLevel] = getVersionAndErrorLevel(
-    encodingMode,
-    targetLength,
+  // Try multiple segmentation strategies and pick whichever fits
+  // in the smallest QR version. Single-mode candidates (whole-byte,
+  // whole-alphanumeric where eligible) usually win for short URLs
+  // because each segment break costs 4 + lengthBits header bits.
+  // Mixed segmentation only beats them when alphanumeric runs are
+  // long enough to amortise that overhead — typical case is a URL
+  // with a `?token=…` query bit where the bulk of the path is
+  // alphanumeric and the `?`/`=` chars force byte mode otherwise.
+  const { segments, version, errorLevel } = pickSegmentation(
+    content,
     minErrorLevel,
+    reservedCapacityRatio,
   );
-  const lengthBits = getLengthBits(encodingMode, version);
   const dataCodewords = getDataCodewords(version, errorLevel);
   const [ecBlockSize, blocks] = EC_TABLE[version - 1][errorLevel];
 
-  const rawData = getData(content, lengthBits, dataCodewords);
+  // The first segment's mode is reported back as the result's
+  // `encodingMode` for caller diagnostics — historically this
+  // field reflected the whole-content mode; now it's "the mode of
+  // the first segment", which is close enough for the only place
+  // it's read (telemetry / debug).
+  const encodingMode = segments[0]?.mode ?? 0b0100;
+  const rawData = getDataFromSegments(segments, version, dataCodewords);
   const data = reorderData(rawData, blocks);
   const ecData = getECData(rawData, blocks, ecBlockSize);
 
@@ -322,4 +330,207 @@ export function getCodewords(
   codewords.set(ecData, data.length);
 
   return { codewords, version, errorLevel, encodingMode };
+}
+
+// ----- Segment-aware encoding -----
+//
+// QR allows a single payload to switch encoding mode mid-stream:
+// each "segment" carries its own [mode bits][length bits][data]
+// header, and decoders concatenate the segment data on read. For
+// payloads that mix alphanumeric and byte characters (URLs with
+// query strings are the canonical case — `?` and `=` are byte-only)
+// segmenting recovers most of the density that whole-content mode
+// selection loses.
+
+export interface ContentSegment {
+  /** Mode bits (0b0001 numeric, 0b0010 alphanumeric, 0b0100 byte). */
+  mode: number;
+  content: string;
+}
+
+const ALPHA_CHAR_RE = /[\dA-Z $%*+\-./:]/;
+
+/**
+ * Split content into runs by encoding mode. The current heuristic
+ * is a single greedy pass: each character is classified as
+ * alphanumeric or byte, and consecutive characters of the same
+ * class group into one segment. A future optimisation could merge
+ * very short alphanumeric runs into adjacent byte runs when the
+ * per-segment header overhead exceeds the density saving.
+ */
+export function segmentContent(content: string): ContentSegment[] {
+  if (content.length === 0) return [{ mode: 0b0100, content: '' }];
+  const segments: ContentSegment[] = [];
+  let currentMode = ALPHA_CHAR_RE.test(content[0]) ? 0b0010 : 0b0100;
+  let buf = content[0];
+  for (let i = 1; i < content.length; i++) {
+    const ch = content[i];
+    const mode = ALPHA_CHAR_RE.test(ch) ? 0b0010 : 0b0100;
+    if (mode === currentMode) {
+      buf += ch;
+    } else {
+      segments.push({ mode: currentMode, content: buf });
+      currentMode = mode;
+      buf = ch;
+    }
+  }
+  segments.push({ mode: currentMode, content: buf });
+  return segments;
+}
+
+/** Bit cost of a single segment at a given QR version. */
+function getSegmentBits(segment: ContentSegment, version: number): number {
+  const lengthBits = getLengthBits(segment.mode, version);
+  const n = segment.content.length;
+  let dataBits = 0;
+  if (segment.mode === 0b0001) {
+    // numeric — 10 bits per 3-digit chunk + 4/7 for trailing 1/2 digits
+    const trailing = n % 3;
+    dataBits = Math.floor(n / 3) * 10 + (trailing === 1 ? 4 : trailing === 2 ? 7 : 0);
+  } else if (segment.mode === 0b0010) {
+    // alphanumeric — 11 bits per 2-char chunk + 6 for a trailing single
+    dataBits = Math.floor(n / 2) * 11 + (n % 2) * 6;
+  } else {
+    // byte — 8 bits per char
+    dataBits = n * 8;
+  }
+  return 4 + lengthBits + dataBits;
+}
+
+function getTotalSegmentBits(
+  segments: ContentSegment[],
+  version: number,
+): number {
+  let total = 0;
+  for (const seg of segments) total += getSegmentBits(seg, version);
+  return total;
+}
+
+/**
+ * Find the smallest version at the highest tolerated error level
+ * that fits the segments' total bit cost. `reservedCapacityRatio`
+ * scales the required-bits target up so a logo overlay's culled
+ * modules still scan.
+ */
+export function getVersionAndErrorLevelForSegments(
+  segments: ContentSegment[],
+  minErrorLevel = 'L',
+  reservedCapacityRatio = 0,
+): [version: number, errorLevel: string] {
+  const errorLevels = 'HQML'.slice(0, 'HQML'.indexOf(minErrorLevel) + 1);
+  for (let version = 1; version <= 40; version++) {
+    for (const errorLevel of errorLevels) {
+      const dataCodewords = getDataCodewords(version, errorLevel);
+      const capacityBits = dataCodewords << 3;
+      const requiredBits = getTotalSegmentBits(segments, version);
+      const target =
+        reservedCapacityRatio > 0
+          ? requiredBits / (1 - reservedCapacityRatio)
+          : requiredBits;
+      if (target <= capacityBits) {
+        return [version, errorLevel];
+      }
+    }
+  }
+  throw new Error('content is too large');
+}
+
+/**
+ * Emit segment headers + data into the codeword buffer, then add
+ * the standard QR terminator + padding. Mirrors `getData`'s
+ * single-mode logic but loops over each segment in turn.
+ */
+function getDataFromSegments(
+  segments: ContentSegment[],
+  version: number,
+  dataCodewords: number,
+): Uint8Array {
+  const data = new Uint8Array(dataCodewords);
+  let offset = 0;
+  for (const segment of segments) {
+    const lengthBits = getLengthBits(segment.mode, version);
+    putBits(data, segment.mode, 4, offset);
+    offset += 4;
+    putBits(data, segment.content.length, lengthBits, offset);
+    offset += lengthBits;
+    const generator = valueGenMap[segment.mode];
+    for (const { value, bitLength } of generator(segment.content)) {
+      putBits(data, value, bitLength, offset);
+      offset += bitLength;
+    }
+  }
+  // Terminator (4 zero bits) + pad to byte boundary, then alternating
+  // 0xEC / 0x11 fillers up to capacity. The buffer is zero-initialised
+  // so the terminator + alignment padding are already in place; we
+  // just pick the right starting byte for the filler pattern.
+  const remainderBits = 8 - (offset & 7);
+  const fillerStart = (offset >> 3) + (remainderBits < 4 ? 2 : 1);
+  for (let index = 0; index < dataCodewords - fillerStart; index++) {
+    const byte = index & 1 ? 17 : 236;
+    data[fillerStart + index] = byte;
+  }
+  return data;
+}
+
+/**
+ * Try every reasonable segmentation strategy and return the one
+ * that fits in the smallest QR version (ties broken by fewer
+ * segments, then by densest first segment). Strategies considered:
+ *
+ *  - Whole-content single mode: numeric, alphanumeric, byte (only
+ *    those that the entire string actually qualifies for).
+ *  - Naive split: mode boundary at every character-class change.
+ *
+ * The naive split wins when the alphanumeric runs are long enough
+ * to amortise the per-segment header overhead (4 + lengthBits per
+ * segment). Short-URL inputs almost always pick a single-mode
+ * candidate; long URLs with `?…=…` query parts pick the split.
+ */
+function pickSegmentation(
+  content: string,
+  minErrorLevel: string,
+  reservedCapacityRatio: number,
+): {
+  segments: ContentSegment[];
+  version: number;
+  errorLevel: string;
+} {
+  const candidates: ContentSegment[][] = [];
+  if (NUMERIC_RE.test(content)) {
+    candidates.push([{ mode: 0b0001, content }]);
+  }
+  if (ALPHANUMERIC_RE.test(content)) {
+    candidates.push([{ mode: 0b0010, content }]);
+  }
+  candidates.push([{ mode: 0b0100, content }]);
+  const split = segmentContent(content);
+  if (split.length > 1) candidates.push(split);
+
+  let best:
+    | {
+        segments: ContentSegment[];
+        version: number;
+        errorLevel: string;
+      }
+    | undefined;
+  for (const segments of candidates) {
+    try {
+      const [version, errorLevel] = getVersionAndErrorLevelForSegments(
+        segments,
+        minErrorLevel,
+        reservedCapacityRatio,
+      );
+      if (
+        !best ||
+        version < best.version ||
+        (version === best.version && segments.length < best.segments.length)
+      ) {
+        best = { segments, version, errorLevel };
+      }
+    } catch {
+      // Strategy didn't fit in any version — skip.
+    }
+  }
+  if (!best) throw new Error('content is too large');
+  return best;
 }
