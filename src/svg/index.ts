@@ -11,9 +11,9 @@ import { renderHorizontal } from './horizontal.js';
 import { renderVertical } from './vertical.js';
 import { renderDiagonal } from './diagonal.js';
 import { renderCells, renderOutline, renderCircuit } from './outline.js';
-import { renderTubemap } from './tubemap.js';
+import { renderMetro } from './tubemap.js';
 import { renderScribble } from './scribble.js';
-import { renderPhoto, renderLogo } from './photo.js';
+import { renderPhoto, renderLogo, renderColorLogo } from './photo.js';
 
 export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
   const style: SvgStyle = options?.style ?? 'square';
@@ -32,7 +32,11 @@ export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
       content += renderCells(qr, 'square', dotSize);
       break;
     case 'dots':
-      content += renderCells(qr, 'circle', dotSize, true);
+      // Dark cells only — light dots used to render a matching white
+      // field over the surface. The `logo` style now owns the
+      // see-through-the-gaps use case, and white-on-white circles
+      // were just adding bytes for a decoder to ignore.
+      content += renderCells(qr, 'circle', dotSize);
       break;
     case 'diamonds':
       content += renderCells(qr, 'diamond', dotSize);
@@ -53,7 +57,7 @@ export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
       content += renderCircuit(qr, lineWidth === 'thin' ? 0.25 : 0.5);
       break;
     case 'metro':
-      content += renderTubemap(qr, lineWidth);
+      content += renderMetro(qr, lineWidth);
       break;
     case 'scribble':
       content += renderScribble(qr, lineWidth);
@@ -69,6 +73,14 @@ export function toSvg(qr: QrMatrix, options?: SvgOptions): string {
         throw new Error("toSvg: style 'logo' requires a `logo` option");
       }
       content += renderLogo(qr, dotSize, options.logo);
+      break;
+    case 'color-logo':
+      if (!options?.colorLogo) {
+        throw new Error(
+          "toSvg: style 'color-logo' requires a `colorLogo` option",
+        );
+      }
+      content += renderColorLogo(qr, dotSize, options.colorLogo);
       break;
     default:
       content += renderCells(qr, 'square', dotSize);

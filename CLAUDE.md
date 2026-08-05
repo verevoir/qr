@@ -11,24 +11,25 @@ QR code encoding engine and SVG renderers. Turns text into scannable QR codes wi
 
 ## SVG Styles
 
-| Style        | Description                                            |
-| ------------ | ------------------------------------------------------ |
-| `square`     | Filled squares per module (default)                    |
-| `dots`       | Round dots — dark and light on the same layer          |
-| `diamonds`   | Diamond-shaped modules rotated 45°                     |
-| `horizontal` | Horizontal line segments                               |
-| `vertical`   | Vertical line segments                                 |
-| `diagonal`   | Diagonal line segments                                 |
-| `network`    | Connected traced paths with diamond tips               |
-| `circuit`    | Connected traced paths with circular tips              |
-| `metro`      | Layered horizontal, vertical and diagonal lines        |
-| `scribble`   | Connected component walking with bezier-smoothed turns |
-| `photo`      | Dot-density modulation from an image sampler — dark-dot size tracks local darkness; light modules in dark regions render as a dark ring with a light centre |
-| `logo`      | Sparse dots overlaid on a composited source image — modules cull where image luminance already provides correct contrast (two-threshold rule, `lum < 0.4` / `lum > 0.7` by default, per ISO/IEC 15415) |
+| Style        | Description                                                                                                                                                                                            |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `square`     | Filled squares per module (default)                                                                                                                                                                    |
+| `dots`       | Round dots — dark modules only (use `logo` for see-through-gap dots)                                                                                                                                   |
+| `diamonds`   | Diamond-shaped modules rotated 45°                                                                                                                                                                     |
+| `horizontal` | Horizontal line segments                                                                                                                                                                               |
+| `vertical`   | Vertical line segments                                                                                                                                                                                 |
+| `diagonal`   | Diagonal line segments                                                                                                                                                                                 |
+| `network`    | Connected traced paths with diamond tips                                                                                                                                                               |
+| `circuit`    | Connected traced paths with circular tips                                                                                                                                                              |
+| `metro`      | Layered horizontal, vertical and diagonal lines                                                                                                                                                        |
+| `scribble`   | Connected component walking with bezier-smoothed turns                                                                                                                                                 |
+| `photo`      | Dot-density modulation from an image sampler — dark-dot size tracks local darkness; light modules in dark regions render as a dark ring with a light centre                                            |
+| `logo`       | Sparse dots overlaid on a composited source image — modules cull where image luminance already provides correct contrast (two-threshold rule, `lum < 0.4` / `lum > 0.7` by default, per ISO/IEC 15415) |
+| `color-logo` | As `photo`, but each dot takes the sampler's `color` instead of black; dot size tracks `prominence`, and a small dark anchor is added when the emitted hue is too light to read as a dark module       |
 
-`photo` and `logo` require a `PhotoSampler` — a curried callback `(size) => (row, col) => { luminance, color? }`. Core library is DOM-free; `imageToSampler` in `@verevoir/qr/web` wraps any `CanvasImageSource` into a sampler. Neither style is surfaced by the `node-qrcode` shim — its API can't carry a sampler callback.
+`photo`, `logo` and `color-logo` require a `PhotoSampler` — a curried callback `(size) => (row, col) => { luminance, color? }`. Core library is DOM-free; `imageToSampler` in `@verevoir/qr/web` wraps any `CanvasImageSource` into a sampler. Neither style is surfaced by the `node-qrcode` shim — its API can't carry a sampler callback.
 
-Fabrication note: `metro`, `photo`, and `logo` are the only styles that can't go directly to single-path fabrication without further processing (overlapping shapes, rings, modulation bands).
+Fabrication note: `metro`, `photo`, `logo`, and `color-logo` are the only styles that can't go directly to single-path fabrication without further processing (overlapping shapes, rings, modulation bands, per-dot colour).
 
 ## Corner Styles
 
@@ -54,7 +55,7 @@ npm install
 - `src/matrix.ts` — QR matrix construction, module placement, format/version info
 - `src/mask.ts` — mask evaluation, penalty scoring, multi-candidate ranking
 - `src/encode.ts` — top-level `encode()` entry point
-- `src/svg/` — SVG renderers (square, dots, diamonds, horizontal, vertical, diagonal, network, circuit, metro, scribble, photo, logo, corners)
+- `src/svg/` — SVG renderers (square, dots, diamonds, horizontal, vertical, diagonal, network, circuit, metro, scribble, photo, logo, color-logo, corners)
 - `src/png.ts` — PNG export via browser canvas (`svgToPng`, `downloadPng`)
 - `src/types.ts` — public type definitions
 

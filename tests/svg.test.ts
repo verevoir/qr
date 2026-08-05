@@ -29,7 +29,7 @@ describe('toSvg', () => {
       expect(svg).not.toContain('fill="#000"');
     });
 
-    it('color.light replaces the light-module fill (finder inner rect, dots light layer)', () => {
+    it('color.light replaces the light-module fill (finder inner rect)', () => {
       const qr = getQr();
       const svg = toSvg(qr, { color: { light: '#fafafa' } });
       expect(svg).toContain('fill="#fafafa"');
@@ -138,6 +138,96 @@ describe('toSvg', () => {
         photo: { sample: uniformSampler(1) },
       });
       expect(svg).toContain('<rect x="1" y="1" width="7" height="7"');
+    });
+  });
+
+  describe('color-logo style', () => {
+    function colorSampler(opts: {
+      luminance: number;
+      color: string;
+      prominence?: number;
+      colorLuminance?: number;
+    }) {
+      return () => () => ({ ...opts });
+    }
+
+    it('throws when colorLogo option is missing', () => {
+      const qr = getQr();
+      expect(() => toSvg(qr, { style: 'color-logo' })).toThrow(/colorLogo/);
+    });
+
+    it('uses the sampled hue for both module values', () => {
+      const qr = getQr();
+      const svg = toSvg(qr, {
+        style: 'color-logo',
+        colorLogo: {
+          sample: colorSampler({
+            luminance: 0.21,
+            color: 'rgb(255,0,0)',
+            prominence: 1,
+            colorLuminance: 0.21,
+          }),
+        },
+      });
+      expect(svg).toContain('stroke="rgb(255,0,0)"');
+      // Red is dark enough to read as dark; light modules need the
+      // small white centre so the decoder still reads "light".
+      expect(svg).toContain('stroke="#fff"');
+      // Red also doesn't need a dark anchor on dark modules.
+      expect(svg).not.toContain('stroke="#000"');
+    });
+
+    it('skips the white centre when the hue is already light', () => {
+      const qr = getQr();
+      // Yellow hue reads as light on its own — light modules don't
+      // need the white centre, and emitting one washes the coloured
+      // ring back to invisible against pale image regions.
+      const svg = toSvg(qr, {
+        style: 'color-logo',
+        colorLogo: {
+          sample: colorSampler({
+            luminance: 0.93,
+            color: 'rgb(255,255,0)',
+            prominence: 1,
+            colorLuminance: 0.93,
+          }),
+        },
+      });
+      expect(svg).toContain('stroke="rgb(255,255,0)"');
+      expect(svg).not.toContain('stroke="#fff"');
+    });
+
+    it('drops a dark anchor when the emitted hue is too light', () => {
+      const qr = getQr();
+      const svg = toSvg(qr, {
+        style: 'color-logo',
+        colorLogo: {
+          sample: colorSampler({
+            luminance: 0.93,
+            color: 'rgb(255,255,0)',
+            prominence: 1,
+            colorLuminance: 0.93,
+          }),
+        },
+      });
+      expect(svg).toContain('stroke="rgb(255,255,0)"');
+      // Yellow sample — pure hue luminance well above the anchor
+      // threshold — gets a small dark centre so the decoder still
+      // reads the cell as dark.
+      expect(svg).toContain('stroke="#000"');
+    });
+
+    it('falls back to 1 − luminance when prominence is omitted', () => {
+      const qr = getQr();
+      // No prominence supplied → photo-style sizing kicks in.
+      const svg = toSvg(qr, {
+        style: 'color-logo',
+        colorLogo: {
+          sample: () => () => ({ luminance: 0, color: 'rgb(0,0,0)' }),
+        },
+      });
+      expect(svg.length).toBeGreaterThan(100);
+      expect(svg).toContain('stroke="rgb(0,0,0)"');
     });
   });
 
@@ -250,11 +340,15 @@ describe('toSvg', () => {
   });
 
   describe('dots style', () => {
-    it('renders both dark and light dots', () => {
+    it('renders dark circles only', () => {
       const qr = getQr();
       const svg = toSvg(qr, { style: 'dots' });
-      expect(svg).toContain('fill="#000"');
-      expect(svg).toContain('fill="#fff"');
+      // Dark cells only — `logo` covers see-through-the-gaps, and
+      // white-on-white circles weren't earning their bytes. The
+      // finder's white inner rect still appears via `fill="#fff"`,
+      // so we narrow the assertion to circle elements.
+      expect(svg).toMatch(/<circle[^>]*fill="#000"/);
+      expect(svg).not.toMatch(/<circle[^>]*fill="#fff"/);
     });
   });
 

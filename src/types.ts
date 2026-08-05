@@ -12,7 +12,8 @@ export type SvgStyle =
   | 'metro'
   | 'scribble'
   | 'photo'
-  | 'logo';
+  | 'logo'
+  | 'color-logo';
 
 export type CornerStyle = 'square' | 'rounded';
 
@@ -36,13 +37,30 @@ export interface SvgColor {
 }
 
 export interface PhotoSample {
-  /** 0 = black, 1 = white. Drives dot diameter. */
+  /** 0 = black, 1 = white. Drives dot diameter for `photo`. */
   luminance: number;
   /**
-   * Optional CSS colour at this cell. Unused by the density renderer,
-   * reserved for future colour-preserving modes.
+   * Optional CSS colour the renderer should emit at this cell.
+   * `color-logo` consumes this — the convention there is to emit
+   * the pure hue (HSV with S=1, V=1) of the sampled pixel, or a
+   * neutral fallback (e.g. `#000`) for achromatic pixels.
    */
   color?: string;
+  /**
+   * Optional 0–1 visual weight of the source pixel — drives the
+   * `color-logo` dot diameter. Convention: `max(1 − V, S × V)` over
+   * HSV, so vivid hues, deep darks, and dark-muted colours all get
+   * larger dots; pale tints and white pixels get smaller. Defaults
+   * to `1 − luminance` if omitted, matching the photo-style sizing.
+   */
+  prominence?: number;
+  /**
+   * Optional 0–1 luminance of the *emitted* `color` (not the source
+   * pixel — see `luminance` for that). `color-logo` reads this to
+   * decide whether to drop a small dark anchor inside a coloured
+   * dot when the emitted hue is too light to read as a dark module.
+   */
+  colorLuminance?: number;
 }
 
 /**
@@ -123,6 +141,15 @@ export interface SvgOptions {
    * alignment patterns always render full-size.
    */
   logo?: LogoOptions;
+  /**
+   * Required when `style: 'color-logo'`. Same dot-density modulation
+   * as `photo`, but each dot uses the colour the sampler returns at
+   * that cell instead of black. When the sampled colour is light
+   * enough to potentially read as a "light" module, a small dark
+   * centre is added to anchor the decoder — mirroring the white
+   * centre `photo` uses for light modules in dark image regions.
+   */
+  colorLogo?: PhotoOptions;
 }
 
 export interface QrMatrix {

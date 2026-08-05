@@ -1,126 +1,5 @@
 import type { QrMatrix, LineWidth } from '../types.js';
-import {
-  duplicateMatrix,
-  fixedFeatureMask,
-  strokeWidth,
-  dotWidth,
-} from './shared.js';
-
-/**
- * Tubemap renderer — diagonal-first, then horizontal and vertical fill in the gaps.
- * Each module is consumed by at most one pass (no visual overlaps).
- *
- * Priority: diagonal \ → diagonal / → horizontal → vertical → singles.
- */
-export function renderTubemap(qr: QrMatrix, lineWidth: LineWidth): string {
-  const matrix = duplicateMatrix(qr.matrix);
-  const mask = fixedFeatureMask(qr);
-  const sw = strokeWidth(lineWidth);
-  const dw = dotWidth(lineWidth);
-  const size = qr.size;
-  let lines = '';
-
-  const isDark = (row: number, col: number) =>
-    mask[row][col] === 1 && matrix[row][col] === 1;
-
-  const consume = (row: number, col: number) => {
-    matrix[row][col] = 0;
-  };
-
-  // --- Diagonal \ ---
-  for (let d = 0; d < 2 * size - 1; d++) {
-    const sRow = Math.max(0, d - size + 1);
-    const sCol = Math.max(0, size - 1 - d);
-    const len = Math.min(size - sRow, size - sCol);
-    let rs: number | undefined;
-    for (let i = 0; i <= len; i++) {
-      const dark = i < len && isDark(sRow + i, sCol + i);
-      if (dark) {
-        if (rs === undefined) rs = i;
-      } else if (rs !== undefined) {
-        if (i - rs >= 2) {
-          const r1 = sRow + rs,
-            c1 = sCol + rs,
-            r2 = sRow + i - 1,
-            c2 = sCol + i - 1;
-          lines += line(c1, r1, c2, r2, sw);
-          for (let j = rs; j < i; j++) consume(sRow + j, sCol + j);
-        }
-        rs = undefined;
-      }
-    }
-  }
-
-  // --- Diagonal / ---
-  for (let d = 0; d < 2 * size - 1; d++) {
-    const sRow = Math.max(0, d - size + 1);
-    const sCol = Math.min(size - 1, d);
-    const len = Math.min(size - sRow, sCol + 1);
-    let rs: number | undefined;
-    for (let i = 0; i <= len; i++) {
-      const dark = i < len && isDark(sRow + i, sCol - i);
-      if (dark) {
-        if (rs === undefined) rs = i;
-      } else if (rs !== undefined) {
-        if (i - rs >= 2) {
-          const r1 = sRow + rs,
-            c1 = sCol - rs,
-            r2 = sRow + i - 1,
-            c2 = sCol - (i - 1);
-          lines += line(c1, r1, c2, r2, sw);
-          for (let j = rs; j < i; j++) consume(sRow + j, sCol - j);
-        }
-        rs = undefined;
-      }
-    }
-  }
-
-  // --- Horizontal ---
-  for (let row = 0; row < size; row++) {
-    let start: number | undefined;
-    for (let col = 0; col <= size; col++) {
-      const dark = col < size && isDark(row, col);
-      if (dark) {
-        if (start === undefined) start = col;
-      } else if (start !== undefined) {
-        if (col - start >= 2) {
-          lines += line(start, row, col - 1, row, sw);
-          for (let c = start; c < col; c++) consume(row, c);
-        }
-        start = undefined;
-      }
-    }
-  }
-
-  // --- Vertical ---
-  for (let col = 0; col < size; col++) {
-    let start: number | undefined;
-    for (let row = 0; row <= size; row++) {
-      const dark = row < size && isDark(row, col);
-      if (dark) {
-        if (start === undefined) start = row;
-      } else if (start !== undefined) {
-        if (row - start >= 2) {
-          lines += line(col, start, col, row - 1, sw);
-          for (let r = start; r < row; r++) consume(r, col);
-        }
-        start = undefined;
-      }
-    }
-  }
-
-  // --- Singles ---
-  let dots = '';
-  for (let row = 0; row < size; row++) {
-    for (let col = 0; col < size; col++) {
-      if (isDark(row, col)) {
-        dots += dot(col, row, dw);
-      }
-    }
-  }
-
-  return lines + dots;
-}
+import { fixedFeatureMask, strokeWidth, dotWidth } from './shared.js';
 
 /**
  * Metro renderer — horizontal over vertical over diagonal.
@@ -133,8 +12,11 @@ export function renderTubemap(qr: QrMatrix, lineWidth: LineWidth): string {
  */
 export function renderMetro(qr: QrMatrix, lineWidth: LineWidth): string {
   const mask = fixedFeatureMask(qr);
-  const sw = strokeWidth(lineWidth);
-  const dw = dotWidth(lineWidth);
+  // Metro reads better with a slightly heavier thin stroke than the
+  // shared default — ~30% bump so layered lines still feel like one
+  // graphic rather than three thin ones laid on top of each other.
+  const sw = strokeWidth(lineWidth, 0.42);
+  const dw = dotWidth(lineWidth, 0.42);
   const size = qr.size;
 
   const isDark = (row: number, col: number) =>
@@ -239,7 +121,7 @@ export function renderMetro(qr: QrMatrix, lineWidth: LineWidth): string {
   for (let row = 0; row < size; row++) {
     for (let col = 0; col < size; col++) {
       if (isDark(row, col) && covered[row][col] === 0) {
-        dots += dot(col, row, dw);
+        dots += diamond(col, row, dw);
       }
     }
   }
@@ -262,6 +144,19 @@ function line(
   return `<line x1="${c1 + 1.5}" y1="${r1 + 1.5}" x2="${c2 + 1.5}" y2="${r2 + 1.5}" stroke="#000" stroke-width="${sw}" stroke-linecap="round"/>`;
 }
 
-function dot(col: number, row: number, dw: number): string {
-  return `<line x1="${col + 1.5}" y1="${row + 1.5}" x2="${col + 1.5}" y2="${row + 1.5}" stroke="#000" stroke-width="${dw}" stroke-linecap="round"/>`;
+/**
+ * Diamond fill for the singles pass — the "stations" between metro
+ * lines. Round dots blended into the rounded line caps; diamonds
+ * keep the singles as visible punctuation at every line width.
+ */
+function diamond(col: number, row: number, dw: number): string {
+  const cx = col + 1.5;
+  const cy = row + 1.5;
+  const r = dw / 2;
+  return (
+    `<path d="M${cx},${cy - r}` +
+    `L${cx + r},${cy}` +
+    `L${cx},${cy + r}` +
+    `L${cx - r},${cy}Z" fill="#000"/>`
+  );
 }

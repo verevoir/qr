@@ -1,6 +1,6 @@
 # @verevoir/qr
 
-Text to QR code in TypeScript. Twelve SVG styles — including two that sample a source image for photo and logo overlays — two corner treatments, PNG export. Zero dependencies.
+Text to QR code in TypeScript. Thirteen SVG styles — including two that sample a source image for photo and logo overlays — two corner treatments, PNG export. Zero dependencies.
 
 ```bash
 npm install @verevoir/qr
@@ -10,8 +10,8 @@ npm install @verevoir/qr
 
 Eight hundred words of spec is one picture:
 
-| squares | dots | horizontal | diagonal | metro |
-| --- | --- | --- | --- | --- |
+| squares                                                    | dots                                                   | horizontal                                                         | diagonal                                                       | metro                                                    |
+| ---------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------ | -------------------------------------------------------------- | -------------------------------------------------------- |
 | <img src="docs/style-square.svg" width="130" alt="Square"> | <img src="docs/style-dots.svg" width="130" alt="Dots"> | <img src="docs/style-horizontal.svg" width="130" alt="Horizontal"> | <img src="docs/style-diagonal.svg" width="130" alt="Diagonal"> | <img src="docs/style-metro.svg" width="130" alt="Metro"> |
 
 Plus diamonds, vertical, network, circuit, and scribble. Same data, different visual treatment; any of them scans.
@@ -38,7 +38,7 @@ const svg = toSvg(results[0], { style: 'dots', cornerStyle: 'rounded' });
 ## Why it exists
 
 - **Zero dependencies.** GF(256) arithmetic, Reed-Solomon error correction, mask evaluation, SVG rendering — all self-contained TypeScript.
-- **Twelve built-in styles.** Most libraries ship one (filled squares). Scanning-reliable variations — dots, diamonds, traced networks, bezier scribbles, plus two image-driven styles (`photo`, `logo`) — let you design instead of settle.
+- **Thirteen built-in styles.** Most libraries ship one (filled squares). Scanning-reliable variations — dots, diamonds, traced networks, bezier scribbles, plus two image-driven styles (`photo`, `logo`) — let you design instead of settle.
 - **SVG out by default.** QR codes are grids; vectors scale perfectly and work in any CAD / fabrication tool. PNG export is there when you need pixels.
 - **Outline tracing.** The `square` and grid-based styles trace connected regions as single paths rather than thousands of rectangles. Smaller files, cleaner output.
 - **Layer separation.** The `dots` renderer outputs dark and light modules as separate `<g>` groups — useful for multi-colour prints and laser cutting.
@@ -52,11 +52,20 @@ import type { SvgStyle } from '@verevoir/qr';
 const qr = encode('https://verevoir.io')[0];
 
 const styles: SvgStyle[] = [
-  'square', 'dots', 'diamonds',
-  'horizontal', 'vertical', 'diagonal',
-  'network', 'circuit', 'metro', 'scribble',
+  'square',
+  'dots',
+  'diamonds',
+  'horizontal',
+  'vertical',
+  'diagonal',
+  'network',
+  'circuit',
+  'metro',
+  'scribble',
   // Image-driven — each requires a PhotoSampler:
-  'photo', 'logo',
+  'photo',
+  'logo',
+  'color-logo',
 ];
 
 for (const style of styles) {
@@ -99,33 +108,34 @@ Browser-only — uses the native canvas API, no `canvas` package required.
 
 ### Options
 
-| Type          | Values                                                                                                                                              | Default    |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `SvgStyle`    | `'square'` \| `'dots'` \| `'diamonds'` \| `'horizontal'` \| `'vertical'` \| `'diagonal'` \| `'network'` \| `'circuit'` \| `'metro'` \| `'scribble'` \| `'photo'` \| `'logo'` | `'square'` |
-| `CornerStyle` | `'square'` \| `'rounded'`                                                                                                                           | `'square'` |
-| `LineWidth`   | `'normal'` \| `'thin'`                                                                                                                              | `'normal'` |
-| `ErrorLevel`  | `'L'` \| `'M'` \| `'Q'` \| `'H'`                                                                                                                    | `'L'`      |
+| Type          | Values                                                                                                                                                                                         | Default    |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `SvgStyle`    | `'square'` \| `'dots'` \| `'diamonds'` \| `'horizontal'` \| `'vertical'` \| `'diagonal'` \| `'network'` \| `'circuit'` \| `'metro'` \| `'scribble'` \| `'photo'` \| `'logo'` \| `'color-logo'` | `'square'` |
+| `CornerStyle` | `'square'` \| `'rounded'`                                                                                                                                                                      | `'square'` |
+| `LineWidth`   | `'normal'` \| `'thin'`                                                                                                                                                                         | `'normal'` |
+| `ErrorLevel`  | `'L'` \| `'M'` \| `'Q'` \| `'H'`                                                                                                                                                               | `'L'`      |
 
 ### SVG styles
 
-| Style        | Description                                            |
-| ------------ | ------------------------------------------------------ |
-| `square`     | Filled squares per module (default)                    |
-| `dots`       | Round dots — dark and light on the same layer          |
-| `diamonds`   | Diamond-shaped modules rotated 45°                     |
-| `horizontal` | Horizontal line segments                               |
-| `vertical`   | Vertical line segments                                 |
-| `diagonal`   | Diagonal line segments                                 |
-| `network`    | Connected traced paths with diamond tips               |
-| `circuit`    | Connected traced paths with circular tips              |
-| `metro`      | Layered horizontal, vertical and diagonal lines        |
-| `scribble`   | Connected component walking with bezier-smoothed turns |
-| `photo`      | Dot-density modulates from an image sampler. Dark-dot diameter tracks local darkness; light modules in dark regions render as a dark ring with a small light centre. Requires `photo: { sample }`. |
-| `logo`       | Sparse dots overlaid on a composited source image. Two-threshold cull per ISO/IEC 15415 — `lum < 0.4` / `lum > 0.7` by default. Requires `logo: { sample }`. |
+| Style        | Description                                                                                                                                                                                         |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `square`     | Filled squares per module (default)                                                                                                                                                                 |
+| `dots`       | Round dots — dark and light on the same layer                                                                                                                                                       |
+| `diamonds`   | Diamond-shaped modules rotated 45°                                                                                                                                                                  |
+| `horizontal` | Horizontal line segments                                                                                                                                                                            |
+| `vertical`   | Vertical line segments                                                                                                                                                                              |
+| `diagonal`   | Diagonal line segments                                                                                                                                                                              |
+| `network`    | Connected traced paths with diamond tips                                                                                                                                                            |
+| `circuit`    | Connected traced paths with circular tips                                                                                                                                                           |
+| `metro`      | Layered horizontal, vertical and diagonal lines                                                                                                                                                     |
+| `scribble`   | Connected component walking with bezier-smoothed turns                                                                                                                                              |
+| `photo`      | Dot-density modulates from an image sampler. Dark-dot diameter tracks local darkness; light modules in dark regions render as a dark ring with a small light centre. Requires `photo: { sample }`.  |
+| `logo`       | Sparse dots overlaid on a composited source image. Two-threshold cull per ISO/IEC 15415 — `lum < 0.4` / `lum > 0.7` by default. Requires `logo: { sample }`.                                        |
+| `color-logo` | As `photo`, but each dot uses the sampler's `color`. Size tracks `prominence`; a dark anchor is added when the emitted hue is too light to read as a dark module. Requires `colorLogo: { sample }`. |
 
 ### Image-driven styles
 
-`photo` and `logo` take a curried `PhotoSampler`:
+`photo`, `logo` and `color-logo` take a curried `PhotoSampler`:
 
 ```typescript
 import { encode, toSvg } from '@verevoir/qr';
