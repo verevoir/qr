@@ -382,11 +382,12 @@ export function segmentContent(content: string): ContentSegment[] {
 function getSegmentBits(segment: ContentSegment, version: number): number {
   const lengthBits = getLengthBits(segment.mode, version);
   const n = segment.content.length;
-  let dataBits = 0;
+  let dataBits: number;
   if (segment.mode === 0b0001) {
     // numeric — 10 bits per 3-digit chunk + 4/7 for trailing 1/2 digits
     const trailing = n % 3;
-    dataBits = Math.floor(n / 3) * 10 + (trailing === 1 ? 4 : trailing === 2 ? 7 : 0);
+    dataBits =
+      Math.floor(n / 3) * 10 + (trailing === 1 ? 4 : trailing === 2 ? 7 : 0);
   } else if (segment.mode === 0b0010) {
     // alphanumeric — 11 bits per 2-char chunk + 6 for a trailing single
     dataBits = Math.floor(n / 2) * 11 + (n % 2) * 6;

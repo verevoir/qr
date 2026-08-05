@@ -7,4 +7,14 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   eslintConfigPrettier,
   { ignores: ['dist/'] },
+  {
+    rules: {
+      // An `_`-prefixed argument is deliberately unused — kept because
+      // the signature is fixed by the caller, not because it was forgotten.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
 );

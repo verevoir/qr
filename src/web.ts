@@ -66,7 +66,8 @@ export function imageToSampler(source: CanvasImageSource): PhotoSampler {
 }
 
 function sourceWidth(source: CanvasImageSource): number {
-  if ('naturalWidth' in source && source.naturalWidth) return source.naturalWidth;
+  if ('naturalWidth' in source && source.naturalWidth)
+    return source.naturalWidth;
   if ('videoWidth' in source && source.videoWidth) return source.videoWidth;
   if ('width' in source) {
     const w = source.width;

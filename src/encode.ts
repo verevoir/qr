@@ -5,9 +5,7 @@ import { rankMasks } from './mask.js';
 export function encode(text: string, options?: EncodeOptions): QrResult[] {
   const logoArea = options?.logoArea ?? 0;
   if (logoArea < 0 || logoArea >= 1) {
-    throw new Error(
-      `encode: logoArea must be in [0, 1), got ${logoArea}`,
-    );
+    throw new Error(`encode: logoArea must be in [0, 1), got ${logoArea}`);
   }
   // A logo covering the centre eats error-correction capacity; H is the
   // only level with enough recovery budget to survive, so reserving any
