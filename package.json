@@ -1,6 +1,6 @@
 {
   "name": "@verevoir/qr",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "QR code encoding engine and SVG renderers — 10 visual styles, layered output, fabrication-ready, zero runtime dependencies. Ships a drop-in node-qrcode shim at ./qrcode.",
   "keywords": [
     "qr",
