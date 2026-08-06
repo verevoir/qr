@@ -6,7 +6,7 @@ QR code encoding engine and SVG renderers. Turns text into scannable QR codes wi
 
 - **Encode** — text to QR matrix. Supports versions 1-40, error correction levels L/M/Q/H, numeric/alphanumeric/byte encoding modes. `logoArea` option reserves capacity for a centre-covering logo (forces H, bumps the version).
 - **Multi-candidate** — returns multiple mask variants above a quality threshold (default: within 30% of best penalty score) so consumers can pick aesthetically.
-- **SVG rendering** — twelve visual styles, two corner styles, line width options, optional layer separation for 3D printing/laser cutting.
+- **SVG rendering** — thirteen visual styles, two corner styles, line width options, optional layer separation for 3D printing/laser cutting.
 - **PNG export** — browser-only `svgToPng()` renders SVG to PNG via canvas. `downloadPng()` convenience helper triggers a file download. Zero dependencies — uses native browser APIs.
 
 ## SVG Styles
